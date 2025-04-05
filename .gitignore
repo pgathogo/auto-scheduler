@@ -1,0 +1,10 @@
+# Files
+*.csv
+*.exe
+*.txt
+
+# Folders
+data/
+icons/
+images/
+__pycache__/
