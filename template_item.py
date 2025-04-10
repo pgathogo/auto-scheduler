@@ -33,7 +33,7 @@ class TemplateItem():
         self._folder_name = ""
         self._folder_id = -1
         self._item_path=""
-        self._item_id = 0
+        self._track_id = 0
         self._item_row = -1
         self._item_title = item_title
         self._time_stamp = self.generate_time_stamp()    
@@ -115,14 +115,17 @@ class TemplateItem():
     def folder_id(self)-> int:
         return self._folder_id
 
-    def set_item_id(self, id: int):
-        self._item_id = id
+    def set_track_id(self, id: int):
+        self._track_id = id
 
-    def item_id(self)->int:
-        return self._item_id
+    def track_id(self)->int:
+        return self._track_id
 
     def item_type(self) -> ItemType:
         return self._item_type
+
+    def set_item_type(self, item_type: ItemType):
+        self._item_type = item_type
 
     def set_item_path(self, ip: str):
         self._item_path = ip
@@ -144,7 +147,6 @@ class TemplateItem():
     def set_item_identifier(self, identifier: str):
         self._item_identifier = identifier
 
-
     def template_id(self) -> int:
         return self._template_id
 
@@ -165,6 +167,9 @@ class TemplateItem():
     
     def set_db_action(self, action: DBAction):
         self._db_action = action
+
+    def formatted_track_id(self) ->str:
+        return(f"{self._track_id:08d}")
         
 
 class HeaderItem(TemplateItem):
@@ -175,7 +180,7 @@ class HeaderItem(TemplateItem):
 
     def make_item_identifier(self) -> str:
         ts = self.time_stamp()
-        self._item_identifier = f"{self._title}{ts}"
+        self._item_identifier = f"HEADER{ts}"
 
     def title(self) -> str:
         return self._title
@@ -250,6 +255,27 @@ class SongItem(TemplateItem):
     def artist_name(self) ->str:
         return self._artist_name
 
+
+class CommercialBreakItem(TemplateItem):
+    def __init__(self, item_title:str=""):
+        super(CommercialBreakItem, self).__init__(item_title)
+        self._item_type = ItemType.COMMERCIAL_BREAK
+        self._title = item_title
+        self._booked_spots = -1
+
+    def make_item_identifier(self):
+        ts = self.time_stamp()
+        self._item_identifier = f"COMM{ts}"
+
+    def title(self):
+        return self._title
+
+    def set_booked_spots(self, booked_spots:int):
+        self._booked_spots = booked_spots
+
+    def booked_spots(self) -> int:
+        return self._booked_spots
+
     # def set_artist_name(self, artist_name:str):
     #     self._artist_name = artist_name
     # def item_id(self):
@@ -308,6 +334,17 @@ class FirstColumnTableWidgetItem(BaseTableWidgetItem):
         self.setBackground(QColor(245,245,245))
 
 FirstColumnTableWidgetItem.register()
+
+
+class CommercialBreakTableWidgetItem(BaseTableWidgetItem):
+    TYPE_INFO = ItemType.COMMERCIAL_BREAK
+    def __init__(self, text: str):
+        super(CommercialBreakTableWidgetItem, self).__init__(text)
+        self.setBackground(QColor(234, 234, 116))
+
+CommercialBreakTableWidgetItem.register()
+
+
 
 
 

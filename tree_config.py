@@ -60,7 +60,7 @@ class TreeConfig:
             self.print_tree(node.children, indent=indent + 2)
 
 print("Building tree...")
-tc = TreeConfig('tree.txt')
+tc = TreeConfig('data/tree.txt')
 tree = tc.read_tree_file()
 tc.print_tree(tree)
     

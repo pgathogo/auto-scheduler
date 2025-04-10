@@ -16,7 +16,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import (
     Qt,
     QSize,
-    QTime
+    QTime,
+    QObject
 )
 
 from PyQt5.QtGui import (
@@ -40,9 +41,13 @@ from template_item import (
 )
 
 from data_config import DataConfiguration
+from csvdata import CSVData
 
 from search_widget import SearchWidget
 from tree_config import TreeConfig
+from mssql_data import MSSQLData
+from schedule_dialog import ScheduleDialog
+
 
 widget, base = uic.loadUiType('template_config.ui')
 
@@ -71,29 +76,60 @@ class Track:
         return self._folder_id
     def file_path(self) -> str:
         return self._file_path
+    def formatted_track_id(self) ->str:
+        return(f"{self._track_id:08d}")
+
+class ItemTableKeyFilter(QObject):
+    def __init__(self, parent):
+        super(ItemTableKeyFilter, self).__init__()
+        self._parent = parent
+    def eventFilter(self, obj, event):
+        if event.type() == event.KeyPress  and event.key() == Qt.Key.Key_Delete:
+            selected = obj.selectedItems()
+            if len(selected) > 0:
+                self._parent.on_delete_item()
+                # item_identifier = selected[0].data(Qt.ItemDataRole.UserRole)
+                # item = self._parent.current_template.item(item_identifier)
+                # if item.item_type() == ItemType.HEADER or item.item_type() == ItemType.EMPTY:
+                #      return False
+                # self._parent.current_template.item(item_identifier).set_db_action(DBAction.DELETE)
+                # # self._parent.current_template.remove_item(item_identifier)
+                # obj.removeRow(selected[0].row())
+
+        return super().eventFilter(obj, event)
+
 
 
 class TemplateConfiguration(widget, base):
-    def __init__(self):
+    def __init__(self, parent):
         super(TemplateConfiguration, self).__init__()
         self.setupUi(self)
+        
+        self.main_window = parent
 
         self.templates = {}
-        self.tracks = {}
         self.item_clicked = ""
         self.current_template = None
 
         self.current_folder = None
         self.current_track = None
 
-        self.db_config = DataConfiguration("templates.db")
+        self.db_config = DataConfiguration("data/templates.db")
 
         self.set_template_table()
-        self.load_tracks()
+
+        self.csv_data = CSVData()
+        self.tracks = self.csv_data.load_tracks()
+
+        #self.load_tracks()
 
         self.btnNew.clicked.connect(self.on_new)
         self.btnSave.clicked.connect(self.on_save)
         self.btnSearch.clicked.connect(self.on_search)
+        self.btnDeleteTemplate.clicked.connect(self.on_delete_template)
+        self.btnDeleteItem.clicked.connect(self.on_delete_item)
+
+        self.btnSchedule.clicked.connect(self.on_create_schedule)
 
         self.wigSearch.hide()
         self.twMedia.setHeaderLabels(["Media"])
@@ -110,9 +146,12 @@ class TemplateConfiguration(widget, base):
 
         self.twTemplates.itemSelectionChanged.connect(self.on_template_selected)
 
+        self.itf = ItemTableKeyFilter(self)
+        self.twItems.installEventFilter(self.itf)
+
         #self.test_new_template()
-        self.test_load_template_items_from_db()
-        # self.load_templates_from_db()
+        # self.test_load_template_items_from_db()
+        self.load_templates_from_db()
         #self.test_folders()
 
     def on_template_selected(self):
@@ -150,6 +189,8 @@ class TemplateConfiguration(widget, base):
         self.twItems.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     
     def _populate_items_table(self, template_items: dict):
+        print(template_items)
+
         for key, item in template_items.items():
             row = self.twItems.rowCount()
             self.twItems.insertRow(row)
@@ -157,16 +198,22 @@ class TemplateConfiguration(widget, base):
             if item.item_type() == ItemType.HEADER:
                 item.set_item_row(row)
 
+            if item.db_action() == DBAction.DELETE:
+                continue
+
             self.add_template_item(row, item)
 
     def _add_blank_rows(self, t_items: dict):
         prev_item = None
         items = {}
         for key, item in t_items.items():
+            print(f"PREV_ITEM: {prev_item.item_type() if prev_item is not None else 'None'}")
+            print(f"ITEM: {item.item_type()}")
             if prev_item is None:
                 prev_item = item
                 items[key] = item
             elif prev_item.item_type() == ItemType.HEADER and item.item_type() == ItemType.HEADER:
+                print('HEADER - HEADER')
                 blank_item = self.make_blank_item()
                 items[blank_item.item_identifier()] = blank_item
                 items[key] = item
@@ -177,6 +224,7 @@ class TemplateConfiguration(widget, base):
                 items[key] = item
                 prev_item = item
             elif prev_item.item_type() == ItemType.FOLDER and item.item_type() == ItemType.HEADER:
+                print('FOLDER - HEADER')
                 blank_item = self.make_blank_item()
                 items[blank_item.item_identifier()] = blank_item
                 items[key] = item
@@ -194,11 +242,11 @@ class TemplateConfiguration(widget, base):
             if column1 is None:
                 continue
 
-            item_id = column1.data(Qt.ItemDataRole.UserRole)
+            item_identifier = column1.data(Qt.ItemDataRole.UserRole)
             #item_id = self.twItems.item(row, 0).data(Qt.ItemDataRole.UserRole)
 
             #item_id = column1.data(Qt.ItemDataRole.UserRole)
-            item = self.current_template.item(item_id)
+            item = self.current_template.item(item_identifier)
 
             if item.item_type() == ItemType.EMPTY:
                 continue
@@ -208,9 +256,10 @@ class TemplateConfiguration(widget, base):
                 prev_start_time = QTime(prev_hr, 0, 0)
                 prev_dur = item.duration()
                 item.set_item_row(row)
+                item.set_start_time(prev_start_time)
                 continue
 
-            # If item has no ID, mark it for creation
+            # If item has no ID (id = -1), mark it for creation, else update
             if item.id() == -1:
                 item.set_db_action(DBAction.CREATE)
             else:
@@ -227,6 +276,8 @@ class TemplateConfiguration(widget, base):
 
 
     def set_template_table(self):
+        self.twTemplates.clear()
+        self.twTemplates.setRowCount(0)
         self.twTemplates.setColumnCount(2)
         self.twTemplates.setHorizontalHeaderLabels(["Name", "Description"])
         self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -261,21 +312,23 @@ class TemplateConfiguration(widget, base):
     def test_load_template_items_from_db(self):
         self.current_template = self.test_get_test_template()
 
-        ti = self.db_config.fetch_all_template_items(1111)
+        ti = self.db_config.fetch_template_items(1111)
         self._setup_items_table()
         items = self._add_blank_rows(ti)
 
-        print(items)
-
         self._populate_items_table(items)
-        
         self.compute_start_times()
-
 
     def load_templates_from_db(self):
         self.templates = self.db_config.fetch_all_templates()
 
-        for name, template in self.templates.items():
+        self.show_templates(self.templates)
+
+    def show_templates(self, templates: dict):
+        self.set_template_table()
+        for name, template in templates.items():
+            if template.db_action() == DBAction.DELETE:
+                continue
             self.add_template_to_table(template)
 
     def add_template_to_table(self, template:Template):
@@ -283,6 +336,7 @@ class TemplateConfiguration(widget, base):
         self.twTemplates.insertRow(row)
         self.twTemplates.setItem(row, 0, QTableWidgetItem(template.name()))
         self.twTemplates.setItem(row, 1, QTableWidgetItem(template.description()))
+
 
     def create_hourly_headers(self, template:Template):
         for hour in template.hours():
@@ -315,8 +369,33 @@ class TemplateConfiguration(widget, base):
         else:
             self.wigSearch.hide()
 
+    def on_delete_template(self):
+        selected = self.twTemplates.selectedItems()
+        if len(selected) > 0:
+            name = selected[0].text()
+            template = self.templates[name]
+            template.set_db_action(DBAction.DELETE)
+            #self.db_config.delete_template(template.id())
+            #del self.templates[name]
+            self.twTemplates.removeRow(selected[0].row())
+            self.show_templates(self.templates)
+
+    def on_delete_item(self):
+        selected = self.twItems.selectedItems()
+        if len(selected) > 0:
+            item_identifier = selected[0].data(Qt.ItemDataRole.UserRole)
+            item = self.current_template.item(item_identifier)
+
+            if item.item_type() == ItemType.HEADER or item.item_type() == ItemType.EMPTY:
+                return
+
+            self.current_template.item(item_identifier).set_db_action(DBAction.DELETE)
+            # self.current_template.remove_item(item_id)
+            print(f'Item DB ID: {self.current_template.item(item_identifier).id()}')
+            self.twItems.removeRow(selected[0].row())
+
     def create_media_folders(self):
-        tc = TreeConfig('tree.txt')
+        tc = TreeConfig('data/tree.txt')
         tree = tc.read_tree_file()
         root_item = self.build_tree(tree)
         self.twMedia.insertTopLevelItem(0, root_item)
@@ -335,14 +414,14 @@ class TemplateConfiguration(widget, base):
                     self.build_tree(node.children, child)
         return item
 
-    def load_tracks(self):
-        with open('tracks.csv',  newline='', encoding="utf-8-sig") as csvfile:
-            reader = csv.reader(csvfile, delimiter=',', quotechar='"')
-            for row in reader:
-                track_id, title, artist_name, duration, artist_id, folder_id, file_path = row
-                track = Track(int(track_id), title, artist_name, int(duration), 
-                              int(artist_id), int(folder_id), file_path )
-                self.tracks[int(track_id)] = track
+    # def load_tracks(self):
+    #     with open('data/tracks.csv',  newline='', encoding="utf-8-sig") as csvfile:
+    #         reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+    #         for row in reader:
+    #             track_id, title, artist_name, duration, artist_id, folder_id, file_path = row
+    #             track = Track(int(track_id), title, artist_name, int(duration), 
+    #                           int(artist_id), int(folder_id), file_path )
+    #             self.tracks[int(track_id)] = track
 
     def on_media_item_clicked(self, item:QTreeWidgetItem):
         node_id = item.data(0, Qt.ItemDataRole.UserRole)
@@ -355,16 +434,17 @@ class TemplateConfiguration(widget, base):
     def show_tracks(self, folder_id: int):
        self.twTracks.clear()
        self.twTracks.setRowCount(0)
-       self.twTracks.setColumnCount(4)
-       self.twTracks.setColumnWidth(0, 350)
-       self.twTracks.setColumnWidth(1, 250)
-       self.twTracks.setColumnWidth(2, 80)
-       self.twTracks.setColumnWidth(3, 50)
-       self.twTracks.setColumnWidth(4, 100)
+       self.twTracks.setColumnCount(5)
+       self.twTracks.setColumnWidth(0, 450)
+       self.twTracks.setColumnWidth(1, 450)
+       self.twTracks.setColumnWidth(2, 160)
+       self.twTracks.setColumnWidth(3, 160)
+       self.twTracks.setColumnWidth(4, 300)
        self.twTracks.setHorizontalHeaderLabels(["Title", "Artist", "Duration", "Track ID", "FilePath"])
        #self.twTracks.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
        tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self.tracks.items()))
+
        for key, track in tracks.items():
            row = self.twTracks.rowCount()
            self.twTracks.insertRow(row)
@@ -373,7 +453,7 @@ class TemplateConfiguration(widget, base):
            self.twTracks.setItem(row, 0, track_title_twi)
            self.twTracks.setItem(row, 1, QTableWidgetItem(track.artist_name()))
            self.twTracks.setItem(row, 2, QTableWidgetItem(str(track.duration())))
-           self.twTracks.setItem(row, 3, QTableWidgetItem(str(track.track_id())))
+           self.twTracks.setItem(row, 3, QTableWidgetItem(track.formatted_track_id()))
            self.twTracks.setItem(row, 4, QTableWidgetItem(track.file_path()))
 
     def on_track_clicked(self):
@@ -389,6 +469,7 @@ class TemplateConfiguration(widget, base):
         if self.item_clicked == "folder":
             new_item = FolderItem(self.twMedia.currentItem().text(0))
             new_item.set_folder_id(self.current_folder['id'])
+            new_item.set_folder_name(self.current_folder['name'])
             new_item.set_item_row(item.row())
 
 
@@ -398,13 +479,15 @@ class TemplateConfiguration(widget, base):
             new_item.set_title(self.current_track.title())
             new_item.set_folder_name(self.current_folder['name'])
             new_item.set_folder_id(self.current_folder['id'])
-            new_item.set_item_id(self.current_track.track_id())
+            new_item.set_track_id(self.current_track.track_id())
             new_item.set_artist_id(self.current_track.artist_id())
             new_item.set_artist_name(self.current_track.artist_name())
             new_item.set_item_path(self.current_track.file_path())
 
         if new_item is None:
             return
+
+        new_item.set_db_action(DBAction.CREATE)
 
         selected = self.twItems.selectedItems()
         item_identifier = selected[0].data(Qt.ItemDataRole.UserRole)
@@ -449,14 +532,39 @@ class TemplateConfiguration(widget, base):
         self.twItems.setItem(row, 3, WidgetItem(item.artist_name()))
         self.twItems.setItem(row, 4, WidgetItem(item.folder_name()))
 
-        if (item.item_id() == 0):
+        if (item.track_id() == 0):
             self.twItems.setItem(row, 5, WidgetItem(""))
         else:
-            self.twItems.setItem(row, 5, WidgetItem((str(item.item_id()))))
+            self.twItems.setItem(row, 5, WidgetItem(((item.formatted_track_id()))))
 
         self.twItems.setItem(row, 6, WidgetItem(item.item_path()))
 
         self.current_template.add_item(item)
+
+    def on_create_schedule(self):
+        if self.current_template is None:
+            return
+        schedule_dlg = ScheduleDialog(self.current_template, self.tracks)
+        self.main_window.mdi_area.addSubWindow(schedule_dlg)
+        schedule_dlg.showMaximized()
+
+    def test_fetch_commercial_breaks(self):
+        server = 'localhost'
+        database = 'citizenfm'
+        username = 'sa'
+        password = 'abc123'
+
+        mssql =  MSSQLData(server, database, username, password)
+        if mssql.connect():
+            sql = (f"Select ScheduleDate, ScheduleTime, ScheduleHour, BookedSpots"
+                   f" from schedule  "
+                   f" where scheduledate = '2025-04-07' "
+                   f" and ItemSource = 'COMMS' "
+                   f" order by ScheduleHour, ScheduleTime ")
+            rows = mssql.execute_query(sql)
+            for row in rows:
+                print(row)
+
 
     def test_folders(self):
         new_item = FolderItem("Folder")

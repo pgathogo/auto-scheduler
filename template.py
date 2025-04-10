@@ -38,6 +38,9 @@ class Template:
     def add_item(self,  item:"TemplateItem"):
         self._template_items[item.item_identifier()] = item
 
+    def assign_items(self, items: OrderedDict):
+        self._template_items = items
+
     def template_items(self) -> OrderedDict:
         return self._template_items
 

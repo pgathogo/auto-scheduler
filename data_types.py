@@ -9,6 +9,7 @@ class ItemType(IntEnum):
     SONG = 1
     FOLDER = 2
     FIRST_COLUMN=3
+    COMMERCIAL_BREAK=4
 
 class DBAction(IntEnum):
     NONE = 0
@@ -34,10 +35,20 @@ class TemplateItemColumns(IntEnum):
     ARTIST_NAME=7
     FOLDER_ID=8
     ITEM_PATH=9
-    ITEM_ID=10
+    TRACK_ID=10
     ITEM_ROW=11
     ITEM_IDENTIFIER=12
     TEMPLATE_ID=13
     FOLDER_NAME=14
+
+MSSQL_CONN = {
+    'server': "localhost",
+    'database': "citizenfm",
+    'username': "sa",
+    'password': "abc123",
+}
+
+
+
     
     
