@@ -12,9 +12,10 @@ from PyQt5.QtCore import (
 widget, base = uic.loadUiType('template_dialog.ui')
 
 class TemplateDialog(widget, base):
-    def __init__(self):
+    def __init__(self, template=None):
         super(TemplateDialog, self).__init__()
         self.setupUi(self)
+        self._template = template
 
         self.selected_hours = []
 
@@ -22,6 +23,15 @@ class TemplateDialog(widget, base):
         self.btnCancel.clicked.connect(self.reject)
 
         self.populate_hours()
+
+        self._initialize_values(self._template)
+        
+    def _initialize_values(self, template):
+        if template is not None:
+            self.txtName.setText(template.name())
+            self.txtDescription.setText(template.description())
+            for hour in template.hours():
+                self.lstHours.item(hour).setCheckState(Qt.CheckState.Checked)
 
     def get_name(self) -> str:
         return self.txtName.text()

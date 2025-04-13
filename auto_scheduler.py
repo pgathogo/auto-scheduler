@@ -66,6 +66,7 @@ class AutoScheduler(widget, base):
         clock_template.showMaximized()
 
     def on_schedule(self):
+        return
         schedule_dlg = ScheduleDialog(self.current_template)
         self.mdi_area.addSubWindow(schedule_dlg)
         schedule_dlg.showMaximized()

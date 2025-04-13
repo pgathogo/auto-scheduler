@@ -19,8 +19,8 @@ class Node:
 
 
 class TreeConfig:
-    def __init__(self, tree_file):
-        self.tree_file = tree_file
+    def __init__(self, records: list[tuple]):
+        self.records = records
 
     def read_tree_file(self):
         tree = []
@@ -28,7 +28,9 @@ class TreeConfig:
         with open(self.tree_file, 'r') as f:
             for line in f:
                 id, node_name, parent_id = line.strip().split('|')
+
                 print(f"{id} {node_name} {parent_id}")
+
                 node = Node(node_name)
                 node.name = node_name
                 node.node_id = int(id)
@@ -36,7 +38,21 @@ class TreeConfig:
                 node.children = []
 
                 tree = self.grow_tree(node, tree)
+
         return tree
+
+    def make_tree(self):
+        tree = []
+        for record in self.records:
+            node = Node(record[1])
+            node.node_id = int(record[0])
+            node.parent_id = int(record[2])
+            node.children = []
+
+            tree = self.grow_tree(node, tree)
+
+        return tree
+        
 
     def grow_tree(self, new_node, tree ):
         if len(tree) == 0:
@@ -59,8 +75,9 @@ class TreeConfig:
             print(f"{node.name}")
             self.print_tree(node.children, indent=indent + 2)
 
-print("Building tree...")
-tc = TreeConfig('data/tree.txt')
-tree = tc.read_tree_file()
-tc.print_tree(tree)
+if __name__ == "__main__":
+    print("Building tree...")
+    tc = TreeConfig('data/tree.txt')
+    tree = tc.read_tree_file()
+    tc.print_tree(tree)
     

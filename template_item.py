@@ -1,3 +1,8 @@
+import os
+import hashlib
+import string
+import random
+
 from PyQt5.QtWidgets import (
     QTableWidgetItem
 )
@@ -134,9 +139,14 @@ class TemplateItem():
         return self._item_path
 
     def generate_time_stamp(self) -> str:
-        dt = datetime.datetime.now()
-        print(f"TemplateItem: {dt}")
-        return f"{dt.day}{dt.month}{dt.year}{dt.hour}{dt.minute}{dt.second}{dt.microsecond}"
+        #dt = datetime.datetime.now()
+        #return f"{dt.day}{dt.month}{dt.year}{dt.hour}{dt.minute}{dt.second}{dt.microsecond}"
+        rand_letters = "".join(random.choices(string.ascii_letters, k=15))
+        rand_ints = "".join(map(str, random.choices(range(100), k=18)))
+        rand_bytes = os.urandom(15)
+        hash_id = hashlib.sha256(rand_letters.encode()+rand_bytes+rand_ints.encode()).hexdigest()
+        return hash_id[0:20]
+
 
     def time_stamp(self):
         return self._time_stamp
@@ -180,7 +190,7 @@ class HeaderItem(TemplateItem):
 
     def make_item_identifier(self) -> str:
         ts = self.time_stamp()
-        self._item_identifier = f"HEADER{ts}"
+        self._item_identifier = f"HEAD{ts}"
 
     def title(self) -> str:
         return self._title
@@ -197,6 +207,10 @@ class BlankItem(TemplateItem):
     def make_item_identifier(self) -> str:
         ts = self.time_stamp()
         self._item_identifier = f"blank{ts}"
+
+    def formatted_time(self):
+        return ""
+
 
     def title(self) -> str:
         return self._title

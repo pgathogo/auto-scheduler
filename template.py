@@ -38,6 +38,29 @@ class Template:
     def add_item(self,  item:"TemplateItem"):
         self._template_items[item.item_identifier()] = item
 
+    def insert_header(self, header_and_blank: list):
+        header = header_and_blank[0]
+        blank = header_and_blank[1]
+        temp_dict = OrderedDict()
+        inserted = False
+        for key, item in self._template_items.items():
+            if isinstance(item.start_time(), str):
+                temp_dict[key] = item
+                continue    
+            if header.start_time() < item.start_time():
+                temp_dict[header.item_identifier()] = header
+                temp_dict[blank.item_identifier()] = blank
+                temp_dict[key] = item
+                inserted = True
+            else:
+                temp_dict[key] = item
+
+        if not inserted:
+            temp_dict[header.item_identifier()] = header
+            temp_dict[blank.item_identifier()] = blank
+
+        self._template_items = temp_dict
+
     def assign_items(self, items: OrderedDict):
         self._template_items = items
 
@@ -55,3 +78,12 @@ class Template:
     
     def set_db_action(self, action: DBAction):
         self._db_action = action
+
+    def get_items_for_hour(self, hour)->list:
+        items = [item for item in self._template_items.values() if item.hour() == hour]
+        return items
+
+    def mark_items_for_deletion(self, hour):
+        for item in self._template_items.values():
+            if item.hour() == hour:
+                item.set_db_action(DBAction.DELETE)

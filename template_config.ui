@@ -71,6 +71,10 @@
            <height>40</height>
           </size>
          </property>
+         <property name="styleSheet">
+          <string notr="true">background-color: rgb(202, 0, 0);
+color: rgb(255, 255, 255);</string>
+         </property>
          <property name="text">
           <string>Delete...</string>
          </property>
@@ -168,7 +172,7 @@
         </size>
        </property>
        <property name="selectionMode">
-        <enum>QAbstractItemView::SingleSelection</enum>
+        <enum>QAbstractItemView::ExtendedSelection</enum>
        </property>
        <property name="selectionBehavior">
         <enum>QAbstractItemView::SelectRows</enum>

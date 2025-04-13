@@ -1,3 +1,4 @@
+import time
 import random
 from collections import OrderedDict
 
@@ -48,11 +49,11 @@ class ScheduleDialog(widget, base):
         self._schedule_items = OrderedDict()
 
         self.btnGenerate.clicked.connect(self.on_generate_schedule)
+        self.btnSave.clicked.connect(self.on_save_schedule)
 
         self.spMain.setSizes([200, 800])
 
         self._setup_defaults()
-
         self._initialize_schedule_table()
 
 
@@ -83,6 +84,7 @@ class ScheduleDialog(widget, base):
         self.edtEndDate.setDate(QDate.currentDate())
 
         self.show_template_time_range(self._template.hours())
+        self.lwHours.itemClicked.connect(self.on_hour_clicked)
 
     
     def show_template_time_range(self, hours: list):
@@ -93,6 +95,33 @@ class ScheduleDialog(widget, base):
             item.setCheckState(Qt.CheckState.Checked)
             item.setData(Qt.ItemDataRole.UserRole, hour)
             self.lwHours.addItem(item)
+
+    def on_hour_clicked(self, item: QListWidgetItem):
+        # Toggle the check state of the clicked item
+        # if item.checkState() == Qt.CheckState.Checked:
+        #     item.setCheckState(Qt.CheckState.Unchecked)
+        # else:
+        #     item.setCheckState(Qt.CheckState.Checked)
+
+        self._show_selected_hours()
+
+    def _show_selected_hours(self):
+        selected_hours = []
+        # Selected hours are the items that are checked
+        for i in range(self.lwHours.count()):
+            item = self.lwHours.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected_hours.append(item.data(Qt.ItemDataRole.UserRole))
+
+        print(selected_hours)
+        # Filter items from self._schedule_items based on selected hours
+        for key, item in self._schedule_items.items():
+            print(item)
+
+
+        filtered_items = [item for item in self._schedule_items.values() if item.hour() in selected_hours]
+        print(f'Filtered: {filtered_items}')
+        self._populate_schedule_table(filtered_items)
 
     def _setup_table_widget(self):
         # Set up the table widget with 5 columns and example row count
@@ -106,19 +135,16 @@ class ScheduleDialog(widget, base):
         end_date = self.edtEndDate.date()
 
         comm_breaks = self.fetch_comm_break(start_date, end_date)
-
         comm_break_items = self._make_comm_break_items(comm_breaks)
-
         template_items = list(self._template.template_items().values())
 
+        # Remove empty items
         schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY]
-
-        processed_items = self._replace_category_placeholders(schedule_items)
-
+        processed_items = self._convert_category_to_track(schedule_items)
         appended_list = self._append_comm_breaks(comm_break_items, processed_items)
 
         self._populate_schedule_table(appended_list)
-
+        self._cache_generated_schedule(appended_list)
 
         
     def _populate_schedule_table(self, processed_items: list):
@@ -127,9 +153,11 @@ class ScheduleDialog(widget, base):
         for i, item in enumerate(processed_items):
             row = self.twSchedule.rowCount()
             self.twSchedule.insertRow(row)
-
             self._add_schedule_item(item, row)
 
+    def _cache_generated_schedule(self, items: list):
+        for item in items:
+            print(item.item_identifier())
             self._schedule_items[item.item_identifier()] = item
         
 
@@ -139,7 +167,8 @@ class ScheduleDialog(widget, base):
         track = tracks[track_id]
         return track
 
-    def _replace_category_placeholders(self, schedule_items):
+
+    def _convert_category_to_track(self, schedule_items):
         s_items = []
         for item in schedule_items:
 
@@ -183,7 +212,6 @@ class ScheduleDialog(widget, base):
         return appended_list
 
 
-
     def _insert_commercial_breaks(self, schedule_items: list, comm_breaks: list):
         insert_locations = OrderedDict()
         prev_slot = -1
@@ -200,9 +228,6 @@ class ScheduleDialog(widget, base):
 
                 if item.start_time() > comm_break.start_time():
 
-                    print(f'IT: {item.start_time().toString("hh:mm:ss")}')
-                    print(f'Slot: {slot} ')
-
                     cbt = comm_break.start_time().toString("hh:mm:ss")
 
                     insert_locations[cbt] = {
@@ -211,8 +236,6 @@ class ScheduleDialog(widget, base):
                     }
                     prev_slot = slot
                     break
-                    
-        print(insert_locations)
 
         for cbt, cb in insert_locations.items():
             schedule_items.insert(cb['slot'], cb['comm_break'])
@@ -224,22 +247,6 @@ class ScheduleDialog(widget, base):
 
         if s_item.item_type() not in BaseTableWidgetItem.widget_register:
             return
-
-        # Get tracks for this folder
-        # if s_item.item_type() == ItemType.FOLDER:
-        #     track = self._pick_a_random_track(s_item.folder_id())
-        #     item = SongItem(track.title())
-        #     item.set_artist_id(track.artist_id())
-        #     item.set_duration(track.duration())
-        #     item.set_title(track.title())
-
-        #     item.set_folder_name(s_item.folder_name())
-        #     item.set_folder_id(s_item.folder_id())
-
-        #     item.set_track_id(track.track_id())
-        #     item.set_artist_id(track.artist_id())
-        #     item.set_artist_name(track.artist_name())
-        #     item.set_item_path(track.file_path())
             
 
         WidgetItem = BaseTableWidgetItem.widget_register[item.item_type()]
@@ -261,7 +268,6 @@ class ScheduleDialog(widget, base):
             
         self.twSchedule.setItem(row, 6, WidgetItem(item.item_path()))
 
-        # self._schedule_items[item.item_identifier()] = item
 
     def _compute_start_times(self):
         for row in range(self.twSchedule.rowCount()):
@@ -322,9 +328,6 @@ class ScheduleDialog(widget, base):
         s2 = e_date.toString('yyyy-MM-dd')
         hours = ', '.join(map(str, self._template.hours()))
 
-        print(f'Start Date: {s1}')
-        print(f'End Date: {s2}')
-
         if dbconn.connect():
             sql = (f"Select ScheduleDate, ScheduleTime, ScheduleHour, BookedSpots"
                    f" from schedule  "
@@ -332,7 +335,7 @@ class ScheduleDialog(widget, base):
                    f" and ScheduleHour in ({hours}) "
                    f" and ItemSource = 'COMMS' "
                    f" order by ScheduleHour, ScheduleTime ")
-            print(sql)
+
             rows = dbconn.execute_query(sql)
             dbconn.disconnect()
             return rows
@@ -343,15 +346,15 @@ class ScheduleDialog(widget, base):
         breaks = []
         for comm_break in comm_breaks:
             date = comm_break[0]
-            time = comm_break[1].strftime('%H:%M:%S')
+            break_time = comm_break[1].strftime('%H:%M:%S')
             hour = comm_break[2]
             booked_spots = comm_break[3]
 
             # Create a new CommercialBreakItem instance
-            title = f"{time} - Commercial Break ({booked_spots} spots)"
+            title = f"{break_time} - Commercial Break ({booked_spots} spots)"
             comm_item = CommercialBreakItem(title)
             comm_item.set_hour(hour)
-            comm_item.set_start_time(QTime.fromString(time, "HH:mm:ss"))
+            comm_item.set_start_time(QTime.fromString(break_time, "HH:mm:ss"))
             comm_item.set_booked_spots(booked_spots)
 
             # Add the item to the table widget or any other UI element
@@ -365,6 +368,12 @@ class ScheduleDialog(widget, base):
             if item.item_type() == ItemType.EMPTY:
                 continue
             schedule_items.append(item)
+
+    def on_save_schedule(self):
+       for key, item in self._schedule_items.items():
+           print(f'Key: {key}:  {item}')
+
+        
 
 
 

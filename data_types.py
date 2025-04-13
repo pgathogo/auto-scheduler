@@ -43,7 +43,7 @@ class TemplateItemColumns(IntEnum):
 
 MSSQL_CONN = {
     'server': "localhost",
-    'database': "citizenfm",
+    'database': "CitizenFM",
     'username': "sa",
     'password': "abc123",
 }

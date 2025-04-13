@@ -84,7 +84,7 @@ class DataConfiguration:
 
         hours = ",".join([str(i) for i in template.hours()])
 
-        upd_stmt = (f"Update templateheader set name='{template.name()}', desc='{template.desc()}', hours='{hours}' "
+        upd_stmt = (f"Update templateheader set name='{template.name()}', desc='{template.description()}', hours='{hours}' "
                     f" Where id={template.id()};"
                     )
 
@@ -397,7 +397,7 @@ class DataConfiguration:
                 items[item.item_identifier()] = item
                 prev_item = item
 
-            time.sleep(0.05)
+            #time.sleep(0.05)
 
         last_blank = self._make_blank_item()
         items[last_blank.item_identifier()] = last_blank
