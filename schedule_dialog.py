@@ -35,7 +35,7 @@ from template_item import (
 )
 
 
-widget, base = uic.loadUiType('schedule.ui')
+widget, base = uic.loadUiType('schedule_dialog.ui')
 
 class ScheduleDialog(widget, base):
     def __init__(self, template: Template, tracks: OrderedDict):
