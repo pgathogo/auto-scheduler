@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QVBoxLayout,
     QWidget,
-    QHeaderView
+    QHeaderView,
+    QComboBox
 )
 
 from PyQt5.QtCore import (
@@ -31,8 +32,9 @@ from template_item import (
     CommercialBreakItem,
     BaseTableWidgetItem,
     SongItem
-
 )
+
+from data_config import DataConfiguration
 
 
 widget, base = uic.loadUiType('schedule_dialog.ui')
@@ -47,6 +49,10 @@ class ScheduleDialog(widget, base):
         self._folder_tracks = {}
 
         self._schedule_items = OrderedDict()
+        self._daily_schedule = {}
+
+        self.db_config = DataConfiguration("data/templates.db")
+        self.mssql_conn = self._make_mssql_connection()
 
         self.btnGenerate.clicked.connect(self.on_generate_schedule)
         self.btnSave.clicked.connect(self.on_save_schedule)
@@ -55,6 +61,11 @@ class ScheduleDialog(widget, base):
 
         self._setup_defaults()
         self._initialize_schedule_table()
+
+        self.twDates.itemClicked.connect(self.on_date_clicked)
+        
+        self._initialize_dates_table()
+        self.spVert.setSizes([300, 700])
 
 
     def _initialize_schedule_table(self):
@@ -78,6 +89,40 @@ class ScheduleDialog(widget, base):
     
         #self.twSchedule.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
+    def _make_mssql_connection(self):
+        server = MSSQL_CONN['server']
+        database = MSSQL_CONN['database']
+        username = MSSQL_CONN['username']  
+        password = MSSQL_CONN['password']
+        return MSSQLData(server, database, username, password)
+
+    def _initialize_dates_table(self):
+        self.twDates.clear()
+        self.twDates.setRowCount(0)
+        self.twDates.setColumnCount(2)
+        self.twDates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.twDates.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
+        self.twDates.setColumnWidth(0, 200)
+        self.twDates.setColumnWidth(1, 200)
+        self.twDates.setHorizontalHeaderLabels(["Date", "Hours"])
+
+
+    def _add_date_to_table(self, date:QDate):
+        row = self.twDates.rowCount()
+        self.twDates.insertRow(row)
+
+        str_date = date.toString("dd-MM-yyyy")
+
+        date_item = QTableWidgetItem(str_date)
+        date_item.setData(Qt.ItemDataRole.UserRole, str_date)
+        self.twDates.setItem(row, 0, date_item)
+
+        hour_widget = QComboBox(self)
+        self.twDates.setCellWidget(row, 1, hour_widget)
+
+    def on_date_clicked(self, item: QTableWidgetItem):
+        date = item.data(Qt.ItemDataRole.UserRole)
+        self._populate_schedule_table(QDate.fromString(date, "dd-MM-yyyy"))
 
     def _setup_defaults(self):
         self.edtStartDate.setDate(QDate.currentDate())
@@ -113,14 +158,8 @@ class ScheduleDialog(widget, base):
             if item.checkState() == Qt.CheckState.Checked:
                 selected_hours.append(item.data(Qt.ItemDataRole.UserRole))
 
-        print(selected_hours)
-        # Filter items from self._schedule_items based on selected hours
-        for key, item in self._schedule_items.items():
-            print(item)
-
-
         filtered_items = [item for item in self._schedule_items.values() if item.hour() in selected_hours]
-        print(f'Filtered: {filtered_items}')
+
         self._populate_schedule_table(filtered_items)
 
     def _setup_table_widget(self):
@@ -132,33 +171,46 @@ class ScheduleDialog(widget, base):
 
     def on_generate_schedule(self):
         start_date = self.edtStartDate.date()
+        dflt_start_date = start_date
         end_date = self.edtEndDate.date()
 
-        comm_breaks = self.fetch_comm_break(start_date, end_date)
-        comm_break_items = self._make_comm_break_items(comm_breaks)
-        template_items = list(self._template.template_items().values())
+        while start_date <= end_date:
+            comm_breaks = self.fetch_comm_break(start_date, self._template.hours())
+            comm_break_items = self._make_comm_break_items(comm_breaks)
+            template_items = list(self._template.template_items().values())
 
-        # Remove empty items
-        schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY]
-        processed_items = self._convert_category_to_track(schedule_items)
-        appended_list = self._append_comm_breaks(comm_break_items, processed_items)
+            # Remove empty items
+            schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY]
+            processed_items = self._convert_category_to_track(schedule_items)
+            appended_list = self._append_comm_breaks(comm_break_items, processed_items)
 
-        self._populate_schedule_table(appended_list)
-        self._cache_generated_schedule(appended_list)
+            self._cache_generated_schedule(start_date, appended_list)
+
+            self._add_date_to_table(start_date)
+
+            start_date = start_date.addDays(1)
+
+        self._populate_schedule_table(dflt_start_date)
 
         
-    def _populate_schedule_table(self, processed_items: list):
+    def _populate_schedule_table(self, sched_date: QDate):
+        processed_items = self._daily_schedule[sched_date.toString("yyyy-MM-dd")]
+
         self._initialize_schedule_table()
 
-        for i, item in enumerate(processed_items):
+        for key, item in processed_items.items():
             row = self.twSchedule.rowCount()
             self.twSchedule.insertRow(row)
+            print(item)
             self._add_schedule_item(item, row)
 
-    def _cache_generated_schedule(self, items: list):
+    def _cache_generated_schedule(self, sched_date: QDate, items: list):
+        schedule_items = OrderedDict()
         for item in items:
-            print(item.item_identifier())
-            self._schedule_items[item.item_identifier()] = item
+            print(f"Item Template ID: {item.template_id()}")
+            schedule_items[item.item_identifier()] = item
+
+        self._daily_schedule[sched_date.toString("yyyy-MM-dd")] = schedule_items
         
 
     def _pick_a_random_track(self, folder_id):
@@ -217,7 +269,6 @@ class ScheduleDialog(widget, base):
         prev_slot = -1
 
         for comm_break in comm_breaks:
-            print(f"Comm Break: {comm_break.start_time().toString('hh:mm:ss')}")
 
             for slot, item in enumerate(schedule_items):
                 if slot <= prev_slot:
@@ -247,7 +298,6 @@ class ScheduleDialog(widget, base):
 
         if s_item.item_type() not in BaseTableWidgetItem.widget_register:
             return
-            
 
         WidgetItem = BaseTableWidgetItem.widget_register[item.item_type()]
 
@@ -319,19 +369,22 @@ class ScheduleDialog(widget, base):
             prev_dur = item.duration()
 
 
-    def fetch_comm_break(self, s_date, e_date):
+    def fetch_comm_break(self, s_date, hrs: list):
         # Fetch the commercial breaks from Traffik database
         dbconn = MSSQLData(MSSQL_CONN['server'], MSSQL_CONN['database'],
                        MSSQL_CONN['username'], MSSQL_CONN['password'])
 
         s1 = s_date.toString('yyyy-MM-dd')
-        s2 = e_date.toString('yyyy-MM-dd')
-        hours = ', '.join(map(str, self._template.hours()))
+
+        # s2 = e_date.toString('yyyy-MM-dd')
+        # hours = ', '.join(map(str, self._template.hours()))
+
+        hours = ', '.join(map(str, hrs))
 
         if dbconn.connect():
             sql = (f"Select ScheduleDate, ScheduleTime, ScheduleHour, BookedSpots"
                    f" from schedule  "
-                   f" where scheduledate between '{s1}' and '{s2}' "
+                   f" where scheduledate = '{s1}' "
                    f" and ScheduleHour in ({hours}) "
                    f" and ItemSource = 'COMMS' "
                    f" order by ScheduleHour, ScheduleTime ")
@@ -369,12 +422,89 @@ class ScheduleDialog(widget, base):
                 continue
             schedule_items.append(item)
 
-    def on_save_schedule(self):
-       for key, item in self._schedule_items.items():
-           print(f'Key: {key}:  {item}')
+    def get_schedule_ref(self) -> int:
+        schedule_ref_found = True
+        schedule_ref = -1
 
+        while schedule_ref_found:
+            schedule_ref = "".join(map(str, random.choices(range(1000), k=12)))[0:9]
+            schedule_ref_found = self.db_config.record_exists(
+                f"Select schedule_ref from schedule where schedule_ref = {schedule_ref};"
+            )
+
+        return int(schedule_ref)
         
+    def on_save_schedule(self):
+       if len(self._daily_schedule) == 0:
+           return
+    
+       schedule_ref = self.get_schedule_ref()
 
+       mssql_stmts = []
+       sqlite_stmts = []
+
+       for sched_date, schedule_items in self._daily_schedule.items():
+           mssql_seq = 0
+           sqlite_seq = 0
+           for key, item in schedule_items.items():
+
+               if item.item_type() == ItemType.EMPTY:
+                   continue
+
+               if item.item_type() == ItemType.COMMERCIAL_BREAK:
+                   continue
+
+               if item.item_type() == ItemType.HEADER:
+                   sqlite_seq += 1
+                   sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
+                   sqlite_stmts.append(sqlite_schedule_record)
+                   continue
+
+               mssql_seq += 1
+               mssql_schedule_record = self._make_mssql_schedule_record(sched_date, schedule_ref, item, mssql_seq)
+               mssql_stmts.append(mssql_schedule_record)
+
+               sqlite_seq += 1
+               sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
+               sqlite_stmts.append(sqlite_schedule_record)
+
+
+       # MSSQL supports multiple statment execution
+       mssql_all = "".join(mssql_stmts)
+       self.mssql_conn.execute_non_query(mssql_all)
+    
+       # SQLite supports single statement execution
+       for stmt in sqlite_stmts:
+           self.db_config.execute_query(stmt)
+
+    def _make_mssql_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
+        status = 'CUED'
+        item_source = 'SONG'
+        comm_audio = 'AUDIO'
+
+        ins_stmt = (f" Insert into schedule (ScheduleService, ScheduleLineRef, ScheduleDate, "
+                    f" ScheduleTime, ScheduleHour, ScheduleHourTime, ScheduleTrackReference, "
+                    f" ScheduledFadeIn, ScheduledFadeOut, ScheduledFadeDelay, PlayStatus, "
+                    f" AutoTransition, LiveTransition, ItemSource, ScheduleCommMediaType )"
+                    f" VALUES ({1}, {schedule_ref}, CONVERT(DATETIME, '{sched_date}', 102), "
+                    f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
+                    f" {seq}, {item.track_id()}, {0}, {0}, {0}, '{status}', {1}, {1}, '{item_source}', '{comm_audio}');"
+                    )
+
+        return ins_stmt
+
+    def _make_sqlite_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
+        ins_stmt = (f" Insert into schedule ( schedule_ref, schedule_date, template_id, start_time, "
+                    f" schedule_hour, item_identifier, item_type, duration, title, artist_id, artist_name, "
+                    f" folder_id, folder_name, track_id, filepath, item_row )"
+                    f" VALUES ({schedule_ref}, '{sched_date}', {self._template.id()}, "
+                    f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
+                    f" '{item.item_identifier()}', {int(item.item_type())}, {item.duration()}, "
+                    f" '{item.title()}', {item.artist_id()}, '{item.artist_name()}', "
+                    f" {item.folder_id()}, '{item.folder_name()}', {item.track_id()}, "
+                    f" '{item.item_path()}', {seq}); ")
+
+        return ins_stmt
 
 
         

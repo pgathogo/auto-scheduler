@@ -98,11 +98,11 @@
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
-     <widget class="QSplitter" name="splitter">
+     <widget class="QSplitter" name="spVert">
       <property name="orientation">
        <enum>Qt::Vertical</enum>
       </property>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
          <widget class="QCheckBox" name="checkBox">
@@ -116,7 +116,7 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <widget class="QCheckBox" name="checkBox_2">
@@ -126,12 +126,21 @@
          </widget>
         </item>
         <item>
-         <widget class="QListWidget" name="lwItemTypes"/>
+         <widget class="QTableWidget" name="twDates">
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <property name="columnCount">
+           <number>2</number>
+          </property>
+          <column/>
+          <column/>
+         </widget>
         </item>
        </layout>
       </widget>
      </widget>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
         <widget class="QLabel" name="label_5">
@@ -155,22 +164,6 @@
     </widget>
    </item>
   </layout>
-  <zorder>label</zorder>
-  <zorder>label_2</zorder>
-  <zorder>edtStartDate</zorder>
-  <zorder>edtEndDate</zorder>
-  <zorder>btnGenerate</zorder>
-  <zorder>twSchedule</zorder>
-  <zorder>btnSave</zorder>
-  <zorder>lwHours</zorder>
-  <zorder>lwItemTypes</zorder>
-  <zorder>btnSave</zorder>
-  <zorder>btnGenerate</zorder>
-  <zorder>btnGenerate</zorder>
-  <zorder>btnGenerate</zorder>
-  <zorder>checkBox</zorder>
-  <zorder>checkBox_2</zorder>
-  <zorder>label_5</zorder>
  </widget>
  <resources/>
  <connections/>

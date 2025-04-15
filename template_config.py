@@ -81,6 +81,7 @@ class TemplateConfiguration(widget, base):
         self.current_track = None
 
         self.db_config = DataConfiguration("data/templates.db")
+        self.mssql_conn = self._make_mssql_connection()
 
         self.set_template_table()
 
@@ -117,6 +118,13 @@ class TemplateConfiguration(widget, base):
         self.twItems.installEventFilter(self.itf)
 
         self.load_templates_from_db()
+
+    def _make_mssql_connection(self):
+        server = MSSQL_CONN['server']
+        database = MSSQL_CONN['database']
+        username = MSSQL_CONN['username']  
+        password = MSSQL_CONN['password']
+        return MSSQLData(server, database, username, password)
 
     def on_template_selected(self):
         if len(self.twTemplates.selectionModel().selectedRows()) > 1:

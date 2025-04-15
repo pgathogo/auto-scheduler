@@ -189,19 +189,6 @@ class DataConfiguration:
         start_time = item.start_time().toString("hh:mm:ss")
         item_row = item.item_row()
 
-        # item_type = int(item.item_type())
-        # hour = item.hour()
-        # duration = item.duration()
-        # title = item.title()
-        # artist_id = item.artist_id()
-        # artist_name = item.artist_name()
-        # folder_id = item.folder_id()
-        # item_path = item.item_path()
-        # item_id = item.item_id()
-        # item_identifier = item.item_identifier()
-        # template_id = item.template_id()
-        # folder_name = item.folder_name()
-
         upd_stmt = (f'Update templateitem set "start_time"="{start_time}", "item_row"={item_row}, '
                     f'Where id={item.id()};'
                 )
@@ -227,6 +214,17 @@ class DataConfiguration:
             curs.execute(del_stmt)
         except:
             print(f"Error deleting template item {item.title()}")
+        finally:
+            con.commit()
+            con.close()
+
+    def execute_query(self, sql_stmt: str):
+        con = self._connect()
+        curs = con.cursor()
+        try:
+            curs.execute(sql_stmt)
+        except:
+            print(f"Error executing query {sql_stmt}")
         finally:
             con.commit()
             con.close()
@@ -284,6 +282,19 @@ class DataConfiguration:
         con.close
 
         return items
+
+
+    def record_exists(self, sql_stmt: str):
+        con = self._connect()
+        curs = con.cursor()
+
+        curs.execute(sql_stmt)
+        
+        rows = curs.fetchall()
+        con.close
+
+        return True if len(rows) > 0 else False
+
 
 
     def _make_template_item(self, db_record):

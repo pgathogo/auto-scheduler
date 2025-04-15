@@ -3,10 +3,10 @@ import pyodbc
 
 class MSSQLData:
     def __init__(self, server, database, username, password):
-        self._server = server
-        self._database = database
-        self._username = username
-        self._password = password
+        self._server = server      # localhost
+        self._database = database  # CitizenFM
+        self._username = username  # sa
+        self._password = password  # abc123
 
         self.conn_str = (
             r'DRIVER={ODBC Driver 17 for SQL Server};'
@@ -46,6 +46,7 @@ class MSSQLData:
             return None
 
     def execute_non_query(self, query):
+        print(query)
         if not self.conn:
             if not self.connect():
                 return False
