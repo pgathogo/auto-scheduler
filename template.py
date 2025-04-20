@@ -8,6 +8,7 @@ class Template:
         self._name = name
         self._description = ""
         self._hours = []
+        self._dow = []
         self._template_items = OrderedDict()
         self._db_action = DBAction.NONE
 
@@ -34,6 +35,12 @@ class Template:
 
     def hours(self) -> list:
         return self._hours
+
+    def dow(self) -> list:
+        return self._dow
+
+    def set_dow(self, dow:list):
+        self._dow = dow
 
     def add_item(self,  item:"TemplateItem"):
         self._template_items[item.item_identifier()] = item

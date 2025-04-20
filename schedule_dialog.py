@@ -47,6 +47,7 @@ class ScheduleDialog(widget, base):
         self._template = template
         self._tracks = tracks
         self._folder_tracks = {}
+        self.selected_date_str = ""
 
         self._schedule_items = OrderedDict()
         self._daily_schedule = {}
@@ -63,10 +64,25 @@ class ScheduleDialog(widget, base):
         self._initialize_schedule_table()
 
         self.twDates.itemClicked.connect(self.on_date_clicked)
+        self.cbHours.stateChanged.connect(self.on_state_changed)
+        self.cbHours.setCheckState(Qt.CheckState.Checked)
         
         self._initialize_dates_table()
         self.spVert.setSizes([300, 700])
 
+        self.setWindowTitle(f"Template: {self._template.name()} - Days of Week: {self.dow_text(self._template.dow())}")
+
+    def dow_text(self, dow: list) -> str:
+        dow_text = {
+            1: "Mon",
+            2: "Tue",
+            3: "Wed",
+            4: "Thu",
+            5: "Fri",
+            6: "Sat",
+            7: "Sun"
+        }
+        return ", ".join([dow_text[d] for d in dow])
 
     def _initialize_schedule_table(self):
         self.twSchedule.clear()
@@ -87,7 +103,6 @@ class ScheduleDialog(widget, base):
         
         self.twSchedule.setHorizontalHeaderLabels(["Start", "Length", "Title", "Artist", "Category", "Filename", "Path" ])
     
-        #self.twSchedule.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
 
     def _make_mssql_connection(self):
         server = MSSQL_CONN['server']
@@ -106,23 +121,40 @@ class ScheduleDialog(widget, base):
         self.twDates.setColumnWidth(1, 200)
         self.twDates.setHorizontalHeaderLabels(["Date", "Hours"])
 
-
     def _add_date_to_table(self, date:QDate):
         row = self.twDates.rowCount()
         self.twDates.insertRow(row)
 
-        str_date = date.toString("dd-MM-yyyy")
+        date_item = QTableWidgetItem(self._display_date_str(date))
+        date_item.setData(Qt.ItemDataRole.UserRole, self._db_date_str(date))
 
-        date_item = QTableWidgetItem(str_date)
-        date_item.setData(Qt.ItemDataRole.UserRole, str_date)
         self.twDates.setItem(row, 0, date_item)
 
         hour_widget = QComboBox(self)
         self.twDates.setCellWidget(row, 1, hour_widget)
 
     def on_date_clicked(self, item: QTableWidgetItem):
-        date = item.data(Qt.ItemDataRole.UserRole)
-        self._populate_schedule_table(QDate.fromString(date, "dd-MM-yyyy"))
+        date_text = item.data(Qt.ItemDataRole.UserRole)
+        items = self._daily_schedule[date_text]
+        if not items:
+            return
+        selected_hours = self._get_selected_hours()
+        filtered_items = {key: item for key, item in items.items() if item.hour() in selected_hours}
+        self._populate_schedule_table(filtered_items)
+
+        self.selected_date_str = date_text
+
+    def _display_date_str(self, date: QDate=None)-> str:
+        # Return date as string of DD-MM-YYYY format for display
+        if date is None:
+            return QDate.currentDate().toString("dd-MM-yyyy")
+        return date.toString("dd-MM-yyyy")
+
+    def _db_date_str(self, date: QDate=None)-> str:
+        # Return date as string of YYYY-MM-DD format for database storage
+        if date is None:
+            return QDate.currentDate().toString("yyyy-MM-dd")
+        return date.toString("yyyy-MM-dd")
 
     def _setup_defaults(self):
         self.edtStartDate.setDate(QDate.currentDate())
@@ -141,26 +173,37 @@ class ScheduleDialog(widget, base):
             item.setData(Qt.ItemDataRole.UserRole, hour)
             self.lwHours.addItem(item)
 
+    def on_state_changed(self, state: int):
+        # Check if the checkbox is checked or unchecked
+        if state == Qt.CheckState.Checked:
+            # Checkbox is checked, show all hours
+            for i in range(self.lwHours.count()):
+                item = self.lwHours.item(i)
+                item.setCheckState(Qt.CheckState.Checked)
+        else:
+            # Checkbox is unchecked, hide all hours
+            for i in range(self.lwHours.count()):
+                item = self.lwHours.item(i)
+                item.setCheckState(Qt.CheckState.Unchecked)
+        self.on_hour_clicked(None)
+
     def on_hour_clicked(self, item: QListWidgetItem):
-        # Toggle the check state of the clicked item
-        # if item.checkState() == Qt.CheckState.Checked:
-        #     item.setCheckState(Qt.CheckState.Unchecked)
-        # else:
-        #     item.setCheckState(Qt.CheckState.Checked)
+        selected_hours = self._get_selected_hours()
+        self._show_selected_hours(selected_hours)
 
-        self._show_selected_hours()
-
-    def _show_selected_hours(self):
+    def _get_selected_hours(self):
         selected_hours = []
         # Selected hours are the items that are checked
         for i in range(self.lwHours.count()):
             item = self.lwHours.item(i)
             if item.checkState() == Qt.CheckState.Checked:
                 selected_hours.append(item.data(Qt.ItemDataRole.UserRole))
+        return selected_hours
 
-        filtered_items = [item for item in self._schedule_items.values() if item.hour() in selected_hours]
-
-        self._populate_schedule_table(filtered_items)
+    def _show_selected_hours(self, hours: list = []):
+        schedule_items = self._daily_schedule.get(self.selected_date_str, {})
+        fi = {key: item for key, item in schedule_items.items() if item.hour() in hours}
+        self._populate_schedule_table(fi)
 
     def _setup_table_widget(self):
         # Set up the table widget with 5 columns and example row count
@@ -174,43 +217,57 @@ class ScheduleDialog(widget, base):
         dflt_start_date = start_date
         end_date = self.edtEndDate.date()
 
+        dow = self._template.dow()
+
         while start_date <= end_date:
+
+            if start_date.dayOfWeek() not in dow:
+                start_date = start_date.addDays(1)
+                continue
+
             comm_breaks = self.fetch_comm_break(start_date, self._template.hours())
             comm_break_items = self._make_comm_break_items(comm_breaks)
             template_items = list(self._template.template_items().values())
 
             # Remove empty items
             schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY]
+
             processed_items = self._convert_category_to_track(schedule_items)
             appended_list = self._append_comm_breaks(comm_break_items, processed_items)
 
             self._cache_generated_schedule(start_date, appended_list)
-
             self._add_date_to_table(start_date)
-
             start_date = start_date.addDays(1)
 
-        self._populate_schedule_table(dflt_start_date)
+        sdate = self._db_date_str(dflt_start_date)
+        if sdate not in self._daily_schedule:
+            return
+        items = self._daily_schedule[sdate]
+        self._populate_schedule_table(items)
+
+        self.selected_date_str = sdate
+
 
         
-    def _populate_schedule_table(self, sched_date: QDate):
-        processed_items = self._daily_schedule[sched_date.toString("yyyy-MM-dd")]
+    def _populate_schedule_table(self, items: dict):
+        # sdate = sched_date.toString("yyyy-MM-dd")
+        # if sdate not in self._daily_schedule:
+        #     return
+        # processed_items = self._daily_schedule[sdate]
 
         self._initialize_schedule_table()
 
-        for key, item in processed_items.items():
+        for key, item in items.items():
             row = self.twSchedule.rowCount()
             self.twSchedule.insertRow(row)
-            print(item)
             self._add_schedule_item(item, row)
 
     def _cache_generated_schedule(self, sched_date: QDate, items: list):
         schedule_items = OrderedDict()
         for item in items:
-            print(f"Item Template ID: {item.template_id()}")
             schedule_items[item.item_identifier()] = item
 
-        self._daily_schedule[sched_date.toString("yyyy-MM-dd")] = schedule_items
+        self._daily_schedule[self._db_date_str(sched_date)] = schedule_items
         
 
     def _pick_a_random_track(self, folder_id):
@@ -374,8 +431,9 @@ class ScheduleDialog(widget, base):
         dbconn = MSSQLData(MSSQL_CONN['server'], MSSQL_CONN['database'],
                        MSSQL_CONN['username'], MSSQL_CONN['password'])
 
-        s1 = s_date.toString('yyyy-MM-dd')
+        s1 = self._db_date_str(s_date)
 
+        # e_date = s_date.toString('yyyy-MM-dd')
         # s2 = e_date.toString('yyyy-MM-dd')
         # hours = ', '.join(map(str, self._template.hours()))
 
@@ -497,7 +555,7 @@ class ScheduleDialog(widget, base):
         ins_stmt = (f" Insert into schedule ( schedule_ref, schedule_date, template_id, start_time, "
                     f" schedule_hour, item_identifier, item_type, duration, title, artist_id, artist_name, "
                     f" folder_id, folder_name, track_id, filepath, item_row )"
-                    f" VALUES ({schedule_ref}, '{sched_date}', {self._template.id()}, "
+                    f" VALUES ({schedule_ref}, '{sched_date}', {item.template_id()}, "
                     f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
                     f" '{item.item_identifier()}', {int(item.item_type())}, {item.duration()}, "
                     f" '{item.title()}', {item.artist_id()}, '{item.artist_name()}', "

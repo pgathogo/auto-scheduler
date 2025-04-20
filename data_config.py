@@ -1,6 +1,10 @@
 import time
 import csv
 
+from PyQt5.QtCore import (
+    QDate
+)
+
 from collections import OrderedDict
 
 import sqlite3
@@ -9,7 +13,8 @@ from data_types import (
     DBAction,
     TemplateColumns,
     TemplateItemColumns,
-    ItemType
+    ItemType,
+    ScheduleColumns
 )
 
 from template import Template
@@ -21,6 +26,7 @@ from template_item import (
     FolderItem,
     SongItem
 )
+from schedule import Schedule
 
 from track import Track
 
@@ -61,9 +67,10 @@ class DataConfiguration:
         curs = con.cursor()
 
         hours = ",".join([str(i) for i in template.hours()])
-
-        ins_stmt = (f"Insert into templateheader ('name', 'desc', 'hours') " 
-                    f" Values ('{template.name()}','{template.description()}','{hours}') RETURNING id;"
+        dow = ",".join([str(i) for i in template.dow()])
+        
+        ins_stmt = (f"Insert into templateheader ('name', 'desc', 'hours', 'dow') " 
+                    f" Values ('{template.name()}','{template.description()}','{hours}', '{dow}') RETURNING id;"
                     )
 
         print(f'Creating template {template.name()}...')
@@ -83,8 +90,11 @@ class DataConfiguration:
         curs = con.cursor()
 
         hours = ",".join([str(i) for i in template.hours()])
+        dow = ",".join([str(i) for i in template.dow()])
+        
 
-        upd_stmt = (f"Update templateheader set name='{template.name()}', desc='{template.description()}', hours='{hours}' "
+        upd_stmt = (f"Update templateheader set name='{template.name()}', "
+                    f" desc='{template.description()}', hours='{hours}', dow='{dow}' "
                     f" Where id={template.id()};"
                     )
 
@@ -235,7 +245,7 @@ class DataConfiguration:
         con = self._connect()
         curs = con.cursor()
 
-        sel_stmt = f"Select id, name, desc, hours From templateheader;"
+        sel_stmt = f"Select id, name, desc, hours, dow From templateheader;"
         curs.execute(sel_stmt)
 
         rows = curs.fetchall()
@@ -357,6 +367,7 @@ class DataConfiguration:
         name = db_record[int(TemplateColumns.NAME)]
         desc = db_record[int(TemplateColumns.DESC)]
         hours_str = db_record[(TemplateColumns.HOURS)]
+        dow_str = db_record[(TemplateColumns.DOW)]
 
         template = Template(name)
 
@@ -364,8 +375,13 @@ class DataConfiguration:
         template.set_name(name)
         template.set_description(desc)
 
+            
         hours = [int(h) for h in hours_str.split(',')]
         template.set_hours(hours)
+
+        if dow_str is not None:
+            dow = [int(d) for d in dow_str.split(',')]
+            template.set_dow(dow)
 
         return template
 
@@ -414,6 +430,91 @@ class DataConfiguration:
         items[last_blank.item_identifier()] = last_blank
 
         return items
+
+
+    def fetch_schedule_by_date(self, date: QDate) ->list:
+        schedule_items = []
+        con = self._connect()
+        curs = con.cursor()
+
+        sel_stmt = (f"SELECT id, schedule_ref, schedule_date, template_id, start_time, "
+                    f" schedule_hour, item_identifier, item_type, duration, title, "
+	                f" artist_id, artist_name, folder_id, folder_name, track_id, filepath, item_row "
+                    f" FROM schedule "
+                    f" WHERE schedule_date = '{date.toString('yyyy-MM-dd')}' "
+                    )
+        curs.execute(sel_stmt)
+
+        rows = curs.fetchall()
+
+        for row in rows:
+            schedule_item = self._make_schedule_item(row)
+
+            if schedule_item is None:
+                continue
+
+            schedule_items.append(schedule_item)
+
+        con.close()
+
+        return schedule_items
+
+    def _make_schedule_item(self, db_record):
+        id = int(db_record[int(ScheduleColumns.ID)])
+        schedule_ref = db_record[int(ScheduleColumns.SCHEDULE_REF)]
+        schedule_date = db_record[int(ScheduleColumns.SCHEDULE_DATE)]
+        template_id = int(db_record[int(ScheduleColumns.TEMPLATE_ID)])
+        start_time = db_record[int(ScheduleColumns.START_TIME)]
+        schedule_hour = int(db_record[int(ScheduleColumns.SCHEDULE_HOUR)])
+        item_identifier = db_record[int(ScheduleColumns.ITEM_IDENTIFIER)]
+        item_type = int(db_record[int(ScheduleColumns.ITEM_TYPE)])
+        duration = int(db_record[int(ScheduleColumns.DURATION)])
+        title = db_record[int(ScheduleColumns.TITLE)]
+        artist_id = int(db_record[int(ScheduleColumns.ARTIST_ID)])
+        artist_name = db_record[int(ScheduleColumns.ARTIST_NAME)]
+        folder_id = int(db_record[int(ScheduleColumns.FOLDER_ID)])
+        folder_name = db_record[int(ScheduleColumns.FOLDER_NAME)]
+        track_id = int(db_record[int(ScheduleColumns.TRACK_ID)])
+        filepath = db_record[int(ScheduleColumns.FILEPATH)]
+        item_row = int(db_record[int(ScheduleColumns.ITEM_ROW)])
+
+        schedule_item = None
+        if item_type == ItemType.HEADER:
+            schedule_item = HeaderItem(title)
+
+        if item_type == ItemType.EMPTY:
+            schedule_item = BlankItem()
+
+        if item_type == ItemType.FOLDER:
+            schedule_item = FolderItem(title)
+
+        if item_type == ItemType.SONG:
+            schedule_item = SongItem(title)
+
+        if schedule_item is None:
+            return None
+
+        schedule_item.set_id(id)
+        schedule_item.set_start_time(start_time)
+        schedule_item.set_hour(schedule_hour)
+        schedule_item.set_duration(duration)
+        schedule_item.set_title(title)
+        schedule_item.set_artist_id(artist_id)
+        schedule_item.set_artist_name(artist_name)
+        schedule_item.set_folder_id(folder_id)
+        schedule_item.set_item_path(filepath)
+        schedule_item.set_track_id(track_id)
+        schedule_item.set_item_row(item_row)
+        schedule_item.set_item_identifier(item_identifier)
+        schedule_item.set_template_id(template_id)
+        schedule_item.set_folder_name(folder_name)
+        schedule_item.set_db_action(DBAction.NONE)
+        schedule_item.set_item_type(item_type)
+        schedule_item.set_schedule_ref(schedule_ref)
+        schedule_item.set_schedule_date(QDate.fromString(schedule_date, "yyyy-MM-dd"))
+
+        return schedule_item
+
 
     def _make_blank_item(self):
         blank = BlankItem()

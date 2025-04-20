@@ -13,7 +13,8 @@ from PyQt5.QtGui import (
 
 from PyQt5.QtCore import (
     Qt,
-    QTime
+    QTime,
+    QDate
 )
 
 import datetime
@@ -45,6 +46,8 @@ class TemplateItem():
         self._db_action = DBAction.NONE
         self._item_identifier = ""
         self._template_id = -1
+        self._schedule_ref = -1
+        self._schedule_date = QDate(0,0,0)
 
         self.make_item_identifier()
 
@@ -138,16 +141,6 @@ class TemplateItem():
     def item_path(self)->str:
         return self._item_path
 
-    def generate_time_stamp(self) -> str:
-        #dt = datetime.datetime.now()
-        #return f"{dt.day}{dt.month}{dt.year}{dt.hour}{dt.minute}{dt.second}{dt.microsecond}"
-        rand_letters = "".join(random.choices(string.ascii_letters, k=15))
-        rand_ints = "".join(map(str, random.choices(range(100), k=18)))
-        rand_bytes = os.urandom(15)
-        hash_id = hashlib.sha256(rand_letters.encode()+rand_bytes+rand_ints.encode()).hexdigest()
-        return hash_id[0:20]
-
-
     def time_stamp(self):
         return self._time_stamp
 
@@ -178,8 +171,32 @@ class TemplateItem():
     def set_db_action(self, action: DBAction):
         self._db_action = action
 
+    def schedule_ref(self) -> int:
+        return self._schedule_ref
+    
+    def set_schedule_ref(self, ref: int):
+        self._schedule_ref = ref
+
+    def schedule_date(self) -> QDate:
+        return self._schedule_date
+
+    def set_schedule_date(self, date: QDate):
+        self._schedule_date = date
+
+    def formatted_date(self) -> str:
+        return self._schedule_date.toString("dd/MM/yyyy")
+
     def formatted_track_id(self) ->str:
         return(f"{self._track_id:08d}")
+
+    def generate_time_stamp(self) -> str:
+        #dt = datetime.datetime.now()
+        #return f"{dt.day}{dt.month}{dt.year}{dt.hour}{dt.minute}{dt.second}{dt.microsecond}"
+        rand_letters = "".join(random.choices(string.ascii_letters, k=15))
+        rand_ints = "".join(map(str, random.choices(range(100), k=18)))
+        rand_bytes = os.urandom(15)
+        hash_id = hashlib.sha256(rand_letters.encode()+rand_bytes+rand_ints.encode()).hexdigest()
+        return hash_id[0:20]
         
 
 class HeaderItem(TemplateItem):
@@ -269,7 +286,6 @@ class SongItem(TemplateItem):
     def artist_name(self) ->str:
         return self._artist_name
 
-
 class CommercialBreakItem(TemplateItem):
     def __init__(self, item_title:str=""):
         super(CommercialBreakItem, self).__init__(item_title)
@@ -290,10 +306,12 @@ class CommercialBreakItem(TemplateItem):
     def booked_spots(self) -> int:
         return self._booked_spots
 
-    # def set_artist_name(self, artist_name:str):
-    #     self._artist_name = artist_name
-    # def item_id(self):
-    #     return self._item_id
+class ScheduleItem(TemplateItem):
+    def __init__(self, item_title:str=""):
+        super(ScheduleItem, self).__init__(item_title)
+        self._item_type = ItemType.SCHEDULE_ITEM
+        self._title = item_title
+
 
 # Table Widget Items 
 

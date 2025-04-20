@@ -105,7 +105,7 @@
       <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout">
         <item>
-         <widget class="QCheckBox" name="checkBox">
+         <widget class="QCheckBox" name="cbHours">
           <property name="text">
            <string>CheckBox</string>
           </property>
@@ -119,9 +119,9 @@
       <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="QCheckBox" name="checkBox_2">
+         <widget class="QLabel" name="dtTitle">
           <property name="text">
-           <string>CheckBox</string>
+           <string/>
           </property>
          </widget>
         </item>

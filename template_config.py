@@ -17,11 +17,13 @@ from PyQt5.QtCore import (
     Qt,
     QSize,
     QTime,
-    QObject
+    QObject,
+    QItemSelectionModel
 )
 
 from PyQt5.QtGui import (
-    QIcon
+    QIcon,
+    QFont
 ) 
 
 from PyQt5 import uic
@@ -48,7 +50,7 @@ from tree_config import TreeConfig
 from mssql_data import MSSQLData
 from schedule_dialog import ScheduleDialog
 
-from data_types import MSSQL_CONN
+from data_types import read_registry, MSSQL_CONN
 from track import Track
 
 
@@ -62,7 +64,7 @@ class ItemTableKeyFilter(QObject):
         if event.type() == event.KeyPress  and event.key() == Qt.Key.Key_Delete:
             selected = obj.selectedItems()
             if len(selected) > 0:
-                self._parent.on_delete_item()
+                self._parent.on_delete_template_item()
         return super().eventFilter(obj, event)
 
 
@@ -76,6 +78,8 @@ class TemplateConfiguration(widget, base):
         self.templates = {}
         self.item_clicked = ""
         self.current_template = None
+
+        self._hour_headers = {}
 
         self.current_folder = None
         self.current_track = None
@@ -101,6 +105,8 @@ class TemplateConfiguration(widget, base):
 
         self.wigSearch.hide()
         self.twMedia.setHeaderLabels(["Media"])
+
+        self.wigStats.hide()
         
         self.spTemplate.setSizes([200, 800])
         self.spMedia.setSizes([200, 800])
@@ -118,6 +124,7 @@ class TemplateConfiguration(widget, base):
         self.twItems.installEventFilter(self.itf)
 
         self.load_templates_from_db()
+
 
     def _make_mssql_connection(self):
         server = MSSQL_CONN['server']
@@ -206,6 +213,10 @@ class TemplateConfiguration(widget, base):
                 
 
     def compute_start_times(self):
+        current_hour = -1
+        total_hour_duration = 0
+        total_hour_time = QTime(0, 0, 0)
+
         for row in range(self.twItems.rowCount()):
 
             column1 = self.twItems.item(row, 0)
@@ -227,6 +238,10 @@ class TemplateConfiguration(widget, base):
                 prev_dur = item.duration()
                 item.set_item_row(row)
                 item.set_start_time(prev_start_time)
+
+                current_hour = item.hour()
+                total_hour_duration = 0
+                total_hour_time = QTime(item.hour(), 0, 0)
                 continue
 
             # If item has no ID (id = -1), mark it for creation, else update
@@ -244,12 +259,17 @@ class TemplateConfiguration(widget, base):
             prev_start_time = start_time
             prev_dur = item.duration()
 
+            total_hour_duration += item.duration()
+            total_hour_time = total_hour_time.addMSecs(item.duration())
+            self._hour_headers[current_hour].setText(total_hour_time.toString("HH:mm:ss"))
+
+
 
     def set_template_table(self):
         self.twTemplates.clear()
         self.twTemplates.setRowCount(0)
-        self.twTemplates.setColumnCount(2)
-        self.twTemplates.setHorizontalHeaderLabels(["Name", "Hours"])
+        self.twTemplates.setColumnCount(3)
+        self.twTemplates.setHorizontalHeaderLabels(["Name", "Hours", "DOW"])
         self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def on_new(self):
@@ -260,14 +280,17 @@ class TemplateConfiguration(widget, base):
             template = Template(dialog.get_name())
             template.set_description(dialog.get_description())
             template.set_hours(dialog.get_selected_hours())
+            template.set_dow(dialog.get_dow())
             template.set_db_action(DBAction.CREATE)
 
             self.templates[template.name()] = template
 
-            self.add_template_to_table(template)
+            twi_name = self.add_template_to_table(template)
             headers = self.create_hourly_headers(template.hours())
             for header in headers:
                 template.add_item(header)
+
+            self.twTemplates.setCurrentItem(twi_name, QItemSelectionModel.SelectCurrent)
                 
 
     def on_edit(self):
@@ -277,6 +300,7 @@ class TemplateConfiguration(widget, base):
         if result == QDialog.Accepted:
             self.templates[self.current_template.name()].set_name(dialog.get_name())
             self.templates[self.current_template.name()].set_description(dialog.get_description())
+            self.templates[self.current_template.name()].set_dow(dialog.get_dow())
 
             updated_hours = dialog.get_selected_hours()
 
@@ -293,7 +317,6 @@ class TemplateConfiguration(widget, base):
                 else:
                     header_and_blank = self.create_hourly_headers([hour])
                     self.templates[self.current_template.name()].insert_header(header_and_blank)
-                    
 
             self.templates[self.current_template.name()].set_hours(updated_hours)
             self.templates[self.current_template.name()].set_db_action(DBAction.UPDATE)
@@ -313,13 +336,39 @@ class TemplateConfiguration(widget, base):
                 continue
             self.add_template_to_table(template)
 
-    def add_template_to_table(self, template:Template):
+    def add_template_to_table(self, template:Template) -> QTableWidgetItem:
         row = self.twTemplates.rowCount()
         self.twTemplates.insertRow(row)
-        self.twTemplates.setItem(row, 0, QTableWidgetItem(template.name()))
+        twi_name = QTableWidgetItem(template.name())
+        self.twTemplates.setItem(row, 0, twi_name)
+
         hours = ", ".join(map(str, template.hours()))
         self.twTemplates.setItem(row, 1, QTableWidgetItem(hours))
+        dow = self._get_dow_names(template.dow())
+        self.twTemplates.setItem(row, 2, QTableWidgetItem(dow))
 
+        return twi_name
+
+
+
+    def _get_dow_names(self, dow: list):
+        dow_names = []
+        for day in dow:
+            if day == 1:
+                dow_names.append("Mon")
+            elif day == 2:
+                dow_names.append("Tue")
+            elif day == 3:
+                dow_names.append("Wed")
+            elif day == 4:
+                dow_names.append("Thu")
+            elif day == 5:
+                dow_names.append("Fri") 
+            elif day == 6:
+                dow_names.append("Sat")
+            elif day == 7:
+                dow_names.append("Sun")
+        return ", ".join(dow_names)
 
     def create_hourly_headers(self, hours:list) ->list:
         headers = []
@@ -335,7 +384,6 @@ class TemplateConfiguration(widget, base):
             headers.append(blank_item)
 
         return headers
-        
 
     def make_blank_item(self):
         blank = BlankItem()
@@ -379,6 +427,8 @@ class TemplateConfiguration(widget, base):
             self.current_template.item(item_identifier).set_db_action(DBAction.DELETE)
             # self.current_template.remove_item(item_id)
             self.twItems.removeRow(selected[0].row())
+
+            self.compute_start_times()
 
     def create_media_folders(self):
         #records = self.read_tree_from_file('data/tree.txt')
@@ -537,7 +587,9 @@ class TemplateConfiguration(widget, base):
         twiTime.setData(Qt.ItemDataRole.UserRole, item.item_identifier())
         self.twItems.setItem(row, 0, twiTime)
 
-        self.twItems.setItem(row, 1, WidgetItem((item.formatted_duration())))
+        wi_duration = WidgetItem(item.formatted_duration())
+
+        self.twItems.setItem(row, 1, wi_duration)
         self.twItems.setItem(row, 2, WidgetItem(item.title()))
         self.twItems.setItem(row, 3, WidgetItem(item.artist_name()))
         self.twItems.setItem(row, 4, WidgetItem(item.folder_name()))
@@ -550,6 +602,11 @@ class TemplateConfiguration(widget, base):
         self.twItems.setItem(row, 6, WidgetItem(item.item_path()))
 
         self.current_template.add_item(item)
+
+        if item.item_type() == ItemType.HEADER:
+            wi_duration.setFont(QFont("Times", 10, QFont.Bold))
+            self._hour_headers[item.hour()] = wi_duration
+
 
     def on_create_schedule(self):
         if self.current_template is None:

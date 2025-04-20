@@ -20,6 +20,7 @@ from PyQt5 import uic
 
 from template_config import TemplateConfiguration
 from schedule_dialog import ScheduleDialog
+from view_schedule_dialog import ViewScheduleDialog
 
 widget, base = uic.loadUiType('auto_scheduler.ui')
 
@@ -52,7 +53,7 @@ class AutoScheduler(widget, base):
         self.on_template_act.triggered.connect(self.on_template)
 
         sch_icon = QIcon('icons/booking.bmp')
-        self.on_schedule_act = QAction(sch_icon, "&Generate Schedule", self)
+        self.on_schedule_act = QAction(sch_icon, "&View Schedule", self)
         self.on_schedule_act.triggered.connect(self.on_schedule)
 
     def create_mdi_child(self, title: str):
@@ -66,10 +67,10 @@ class AutoScheduler(widget, base):
         clock_template.showMaximized()
 
     def on_schedule(self):
-        return
-        schedule_dlg = ScheduleDialog(self.current_template)
-        self.mdi_area.addSubWindow(schedule_dlg)
-        schedule_dlg.showMaximized()
+        view_schedule = ViewScheduleDialog(self)
+        self.mdi_area.addSubWindow(view_schedule)
+        view_schedule.showMaximized()
+
 
     def create_toolbar(self):
         self.main_toolbar = self.addToolBar('Main')
