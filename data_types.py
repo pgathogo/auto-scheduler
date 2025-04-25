@@ -90,13 +90,6 @@ def read_registry()->dict:
 
 MSSQL_CONN = read_registry()
 
-# MSSQL_CONN = {
-#     'server': "localhost",
-#     'database': "CitizenFM",
-#     'username': "sa",
-#     'password': "abc123",
-# }
-
 
 
     
