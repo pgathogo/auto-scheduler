@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import (
    QTableWidgetItem,
    QHeaderView,
    QTreeWidgetItem,
-   QAbstractScrollArea
+   QAbstractScrollArea,
+   QMessageBox,
 )
 
 from PyQt5.QtCore import (
@@ -50,7 +51,12 @@ from tree_config import TreeConfig
 from mssql_data import MSSQLData
 from schedule_dialog import ScheduleDialog
 
-from data_types import read_registry, MSSQL_CONN
+from data_types import (
+    read_registry, 
+    MSSQL_CONN,
+    TrackColumns
+)
+
 from track import Track
 
 
@@ -501,9 +507,15 @@ class TemplateConfiguration(widget, base):
        self.twTracks.setHorizontalHeaderLabels(["Title", "Artist", "Duration", "Track ID", "FilePath"])
        #self.twTracks.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-       tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self.tracks.items()))
+       #tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self.tracks.items()))
+       if folder_id not in self.tracks:
+           return
 
-       for key, track in tracks.items():
+       tracks = self.tracks[folder_id]
+       if len(tracks) == 0:
+              return
+
+       for track_ref, track in tracks.items():
            row = self.twTracks.rowCount()
            self.twTracks.insertRow(row)
            track_title_twi = QTableWidgetItem(track.title())
@@ -519,12 +531,22 @@ class TemplateConfiguration(widget, base):
         if len(selected) > 0:
             self.item_clicked = "track"
             track_id = selected[0].data(Qt.ItemDataRole.UserRole)
-            self.current_track = self.tracks[track_id]
+            self.current_track = self.tracks[self.current_folder['id']][track_id]
 
     def on_item_double_clicked(self, item:QTableWidgetItem):
         new_item = None
 
         if self.item_clicked == "folder":
+            # Check if folder has tracks
+            fid = self.current_folder['id']
+            if fid not in self.tracks:
+                self.show_message("No tracks in folder")
+                return
+
+            if len(self.tracks[fid]) == 0:
+                self.show_message("No tracks in folder")
+                return
+
             new_item = FolderItem(self.twMedia.currentItem().text(0))
             new_item.set_folder_id(self.current_folder['id'])
             new_item.set_folder_name(self.current_folder['name'])
@@ -615,8 +637,8 @@ class TemplateConfiguration(widget, base):
         self.main_window.mdi_area.addSubWindow(schedule_dlg)
         schedule_dlg.showMaximized()
 
-    def load_tracks(self):
-        tracks = {}
+    def load_tracks(self) -> dict:
+        folders = {}
 
         server = MSSQL_CONN['server']
         database = MSSQL_CONN['database']
@@ -632,19 +654,32 @@ class TemplateConfiguration(widget, base):
 
             rows = mssql.execute_query(sql)
             for row in rows:
-                track = Track(int(row[0]))
-                track.set_title(row[1])
-                track.set_artist_name(row[2])
-                track.set_duration(int(row[3]))
+                track_reference = int(row[int(TrackColumns.TRACK_REFERENCE)])
+                track = Track(track_reference)
+                track.set_title(row[TrackColumns.TRACK_TITLE])
+                track.set_artist_name(row[TrackColumns.ARTIST_SEARCH])
+                track.set_duration(int(row[TrackColumns.DURATION]))
 
-                track.set_artist_id(int(row[4]))
+                track.set_artist_id(int(row[TrackColumns.ARTISTID_1]))
 
-                track.set_folder_id(int(row[5]))
-                track.set_file_path(row[6])
+                folder_id = int(row[TrackColumns.FOLDER_ID])
+                track.set_folder_id(folder_id)
+                track.set_file_path(row[TrackColumns.FILEPATH])
 
-                tracks[int(row[0])] = track
+                if folder_id in folders:
+                    folders[folder_id][track_reference] = track
+                else:
+                     folders[folder_id] = {}
+                     folders[folder_id][track_reference] = track
 
-            return tracks
+        return folders
+
+    def show_message(self, message:str):
+        msg = QMessageBox(self)
+        msg.setText(message)
+        msg.setWindowTitle("Message")
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec_()
 
 
         

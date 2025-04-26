@@ -250,11 +250,6 @@ class ScheduleDialog(widget, base):
 
         
     def _populate_schedule_table(self, items: dict):
-        # sdate = sched_date.toString("yyyy-MM-dd")
-        # if sdate not in self._daily_schedule:
-        #     return
-        # processed_items = self._daily_schedule[sdate]
-
         self._initialize_schedule_table()
 
         for key, item in items.items():
@@ -271,7 +266,10 @@ class ScheduleDialog(widget, base):
         
 
     def _pick_a_random_track(self, folder_id):
-        tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self._tracks.items()))
+        #tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self._tracks.items()))
+        tracks = self._tracks[folder_id]
+        if len(tracks) == 0:
+            return None
         track_id = random.choice(list(tracks.keys()))
         track = tracks[track_id]
         return track
@@ -284,7 +282,14 @@ class ScheduleDialog(widget, base):
             if item.item_type() != ItemType.FOLDER:
                 s_items.append(item)
             else:
+
                 track = self._pick_a_random_track(item.folder_id())
+
+                # TODO: Check if track is None and handle it
+                # appropriately (e.g., log a message, skip the item, etc.)
+                if track is None:
+                    continue
+
                 track_item = SongItem(track.title())
                 track_item.set_artist_id(track.artist_id())
                 track_item.set_duration(track.duration())

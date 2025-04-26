@@ -64,6 +64,15 @@ class ScheduleColumns(IntEnum):
     FILEPATH = 15
     ITEM_ROW = 16
 
+class TrackColumns(IntEnum):
+    TRACK_REFERENCE = 0
+    TRACK_TITLE = 1
+    ARTIST_SEARCH = 2
+    DURATION = 3
+    ARTISTID_1 = 4
+    FOLDER_ID = 5
+    FILEPATH = 6
+
 
 def read_registry()->dict:
     access_reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
