@@ -79,6 +79,7 @@ def read_registry()->dict:
             database = tok.split("=")[1]
         if tok.strip().startswith("User"):
             username = tok.split("=")[1]
+
     conn = {
         "server": server,
         "database": database,

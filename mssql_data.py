@@ -3,18 +3,20 @@ import pyodbc
 
 class MSSQLData:
     def __init__(self, server, database, username, password):
-        self._server = server      # localhost
-        self._database = database  # CitizenFM
-        self._username = username  # sa
-        self._password = password  # abc123
+        self._server = server      
+        self._database = database  
+        self._username = username  
+        self._password = password  
+        self._sql_driver ="{ODBC Driver 18 for SQL Server}"
 
-        self.conn_str = (
-            r'DRIVER={ODBC Driver 17 for SQL Server};'
-            r'SERVER=' + self._server + ';'
-            r'DATABASE=' + self._database + ';'
-            r'UID=' + self._username + ';'
-            r'PWD=' + self._password + ';'
-        )
+        self.conn_str = (f"DRIVER={self._sql_driver};"
+                        f"TrustServerCertificate=yes;"
+                        f"SERVER={self._server};"
+                        f"DATABASE={self._database};"
+                        f"UID={self._username};"
+                        f"PWD={self._password};"
+                        )
+
         self.conn = None
 
     def connect(self):
