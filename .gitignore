@@ -2,9 +2,11 @@
 *.csv
 *.exe
 *.txt
+*~
+*__*
 
 # Folders
 data/
 icons/
 images/
-__pycache__/
+_pycache__/

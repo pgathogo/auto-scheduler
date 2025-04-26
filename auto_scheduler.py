@@ -37,15 +37,11 @@ class AutoScheduler(widget, base):
         self.mdi_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.setCentralWidget(self.mdi_area)
 
-        #self.mdi_area.subWindowActivated.connect(self.on_sub_window_activated)
-
         self.create_actions()
         self.create_toolbar()
         self.create_statusbar()
 
         self.setWindowTitle("Auto-Scheduler")
-
-        #self.setupUi(self)
 
     def create_actions(self):
         temp_icon = QIcon('icons/createbreak.bmp')
@@ -90,4 +86,4 @@ class AutoScheduler(widget, base):
 app = QApplication(sys.argv)
 auto_scheduler = AutoScheduler()
 auto_scheduler.show()
-sys.exit(app.exec_())   # This line is not executed when the script is run from the command line
+sys.exit(app.exec_())   
