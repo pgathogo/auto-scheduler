@@ -266,7 +266,8 @@ class ScheduleDialog(widget, base):
         
 
     def _pick_a_random_track(self, folder_id):
-        #tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self._tracks.items()))
+        if folder_id not in self._tracks:
+            return None
         tracks = self._tracks[folder_id]
         if len(tracks) == 0:
             return None
