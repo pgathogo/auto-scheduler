@@ -71,13 +71,13 @@ def read_registry()->dict:
     conn_str = winreg.QueryValueEx(access_key, "ConnectionString")
     tokens = conn_str[0].split(";")
     for tok in tokens:
-        if tok.strip().startswith("Password"):
+        if tok.strip().lower().startswith("password"):
             password = tok.split("=")[1]
-        if tok.strip().startswith("Data"):
+        if tok.strip().lower().startswith("data"):
             server = tok.split("=")[1]
-        if tok.strip().startswith("Initial"):
+        if tok.strip().lower().startswith("initial"):
             database = tok.split("=")[1]
-        if tok.strip().startswith("User"):
+        if tok.strip().lower().startswith("user"):
             username = tok.split("=")[1]
 
     conn = {
