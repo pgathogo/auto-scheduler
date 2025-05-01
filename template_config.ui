@@ -88,6 +88,22 @@ color: rgb(255, 255, 255);</string>
         </widget>
        </item>
        <item>
+        <widget class="QPushButton" name="btnStats">
+         <property name="minimumSize">
+          <size>
+           <width>90</width>
+           <height>40</height>
+          </size>
+         </property>
+         <property name="text">
+          <string>Show Stats</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QPushButton" name="btnSave">
          <property name="minimumSize">
           <size>
@@ -148,7 +164,7 @@ color: rgb(255, 255, 255);</string>
      <property name="orientation">
       <enum>Qt::Vertical</enum>
      </property>
-     <widget class="QSplitter" name="splitter">
+     <widget class="QSplitter" name="spStats">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
@@ -199,7 +215,20 @@ color: rgb(255, 255, 255);</string>
       <widget class="QWidget" name="wigStats" native="true">
        <layout class="QVBoxLayout" name="verticalLayout_5">
         <item>
-         <widget class="QTableWidget" name="twStats"/>
+         <widget class="QTableWidget" name="twStats">
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SingleSelection</enum>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <attribute name="verticalHeaderVisible">
+           <bool>false</bool>
+          </attribute>
+         </widget>
         </item>
        </layout>
       </widget>

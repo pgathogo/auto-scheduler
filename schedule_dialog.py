@@ -11,7 +11,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QHeaderView,
-    QComboBox
+    QComboBox,
+    QMessageBox
 )
 
 from PyQt5.QtCore import (
@@ -25,7 +26,8 @@ from mssql_data import MSSQLData
 
 from data_types import (
     MSSQL_CONN,
-    ItemType
+    ItemType,
+    CommercialColumn
 )
 
 from template_item import (
@@ -48,6 +50,7 @@ class ScheduleDialog(widget, base):
         self._tracks = tracks
         self._folder_tracks = {}
         self.selected_date_str = ""
+        self.schedule_is_saved = False
 
         self._schedule_items = OrderedDict()
         self._daily_schedule = {}
@@ -247,7 +250,6 @@ class ScheduleDialog(widget, base):
 
         self.selected_date_str = sdate
 
-
         
     def _populate_schedule_table(self, items: dict):
         self._initialize_schedule_table()
@@ -273,6 +275,8 @@ class ScheduleDialog(widget, base):
             return None
         track_id = random.choice(list(tracks.keys()))
         track = tracks[track_id]
+        if track.duration() == 0:
+            return None
         return track
 
 
@@ -317,8 +321,8 @@ class ScheduleDialog(widget, base):
             items = [item for item in processed_items if item.hour() == hour]
             header_item = items.pop(0)
 
-            self._compute_hourly_start_times(items)
             mixed_items = items + hour_comm_breaks
+            self._compute_hourly_start_times(mixed_items)
 
             mixed_items.sort(key=lambda x: x.start_time())
             mixed_items.insert(0, header_item)
@@ -439,19 +443,21 @@ class ScheduleDialog(widget, base):
 
         s1 = self._db_date_str(s_date)
 
-        # e_date = s_date.toString('yyyy-MM-dd')
-        # s2 = e_date.toString('yyyy-MM-dd')
-        # hours = ', '.join(map(str, self._template.hours()))
-
         hours = ', '.join(map(str, hrs))
 
         if dbconn.connect():
-            sql = (f"Select ScheduleDate, ScheduleTime, ScheduleHour, BookedSpots"
-                   f" from schedule  "
-                   f" where scheduledate = '{s1}' "
-                   f" and ScheduleHour in ({hours}) "
-                   f" and ItemSource = 'COMMS' "
-                   f" order by ScheduleHour, ScheduleTime ")
+            sql = (f"Select Schedule.ScheduleDate, Schedule.ScheduleTime, Schedule.ScheduleHour, "
+                    f"Schedule.BookedSpots,   sum(Spots.SpotBookedDuration) SpotBookedDuration "
+                    f"from schedule, SpotBookings, Spots  "
+                    f"where Schedule.ScheduleReference = SpotBookings.SpotBookingBreakRef "
+                    f"and Spots.SpotRef = SpotBookings.SpotBookingSpot "
+                    f"and scheduledate = '{s1}' "
+                    f"and ScheduleHour in ({hours}) "
+                    f"and ItemSource = 'COMMS' "
+                    f"and SpotBookingPlayStatus <> 'CANCEL' "
+                    f"Group By Schedule.ScheduleDate, Schedule.ScheduleTime, Schedule.ScheduleHour, "
+                    f"Schedule.BookedSpots "
+                    f"order by ScheduleHour, ScheduleTime")
 
             rows = dbconn.execute_query(sql)
             dbconn.disconnect()
@@ -462,17 +468,20 @@ class ScheduleDialog(widget, base):
     def _make_comm_break_items(self, comm_breaks):
         breaks = []
         for comm_break in comm_breaks:
-            date = comm_break[0]
-            break_time = comm_break[1].strftime('%H:%M:%S')
-            hour = comm_break[2]
-            booked_spots = comm_break[3]
+            date = comm_break[CommercialColumn.SCHEDULE_DATE]
+            break_time = comm_break[CommercialColumn.SCHEDULE_TIME].strftime('%H:%M:%S')
+            hour = comm_break[CommercialColumn.SCHEDULE_HOUR]
+            booked_spots = comm_break[CommercialColumn.BOOKED_SPOTS]
+            booked_duration = comm_break[CommercialColumn.BOOKED_DURATION]
 
             # Create a new CommercialBreakItem instance
-            title = f"{break_time} - Commercial Break ({booked_spots} spots)"
+            title = f"{break_time} - Commercial Break ({booked_spots} spot{'' if booked_spots == 1 else 's'})"
+
             comm_item = CommercialBreakItem(title)
             comm_item.set_hour(hour)
             comm_item.set_start_time(QTime.fromString(break_time, "HH:mm:ss"))
             comm_item.set_booked_spots(booked_spots)
+            comm_item.set_booked_duration(booked_duration*1000)
 
             # Add the item to the table widget or any other UI element
             breaks.append(comm_item)
@@ -499,7 +508,12 @@ class ScheduleDialog(widget, base):
         return int(schedule_ref)
         
     def on_save_schedule(self):
+       if self.schedule_is_saved:
+           self.show_message("Schedule already saved!")
+           return
+
        if len(self._daily_schedule) == 0:
+           self.show_message("No schedule to save!")
            return
     
        schedule_ref = self.get_schedule_ref()
@@ -541,6 +555,9 @@ class ScheduleDialog(widget, base):
        for stmt in sqlite_stmts:
            self.db_config.execute_query(stmt)
 
+       self.schedule_is_saved = True
+       self.show_message("Schedule saved successfully!")
+
     def _make_mssql_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
         status = 'CUED'
         item_source = 'SONG'
@@ -570,5 +587,11 @@ class ScheduleDialog(widget, base):
 
         return ins_stmt
 
+    def show_message(self, message:str):
+        msg = QMessageBox(self)
+        msg.setText(message)
+        msg.setWindowTitle("Message")
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec_()
 
         

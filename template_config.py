@@ -59,6 +59,8 @@ from data_types import (
 
 from track import Track
 
+from template_stats import TemplateStatistics
+
 
 widget, base = uic.loadUiType('template_config.ui')
 
@@ -98,10 +100,9 @@ class TemplateConfiguration(widget, base):
         # self.csv_data = CSVData()
         # self.tracks = self.csv_data.load_tracks()
 
-        self.tracks = self.load_tracks()
-
         self.btnNew.clicked.connect(self.on_new)
         self.btnEdit.clicked.connect(self.on_edit)
+        self.btnStats.clicked.connect(self.on_stats)
         self.btnSave.clicked.connect(self.on_save)
         self.btnSearch.clicked.connect(self.on_search)
         self.btnDeleteTemplate.clicked.connect(self.on_delete_template)
@@ -116,12 +117,15 @@ class TemplateConfiguration(widget, base):
         
         self.spTemplate.setSizes([200, 800])
         self.spMedia.setSizes([200, 800])
+        self.spStats.setSizes([800, 200])
 
         self.twMedia.itemClicked.connect(self.on_media_item_clicked)
         self.twTracks.itemClicked.connect(self.on_track_clicked)
 
         self.twItems.itemDoubleClicked.connect(self.on_item_double_clicked)
 
+        self.tracks = self.load_tracks()
+        self.tracks_avg = {}
         self.create_media_folders()
 
         self.twTemplates.itemSelectionChanged.connect(self.on_template_selected)
@@ -130,6 +134,8 @@ class TemplateConfiguration(widget, base):
         self.twItems.installEventFilter(self.itf)
 
         self.load_templates_from_db()
+
+        self.template_stats = TemplateStatistics(self.twStats)   
 
 
     def _make_mssql_connection(self):
@@ -143,12 +149,14 @@ class TemplateConfiguration(widget, base):
         if len(self.twTemplates.selectionModel().selectedRows()) > 1:
             return
         selected = self.twTemplates.selectedItems()
+
         if len(selected) > 0:
             name = selected[0].text()
             template = self.templates[name]
             self.current_template = template
             self.display_template_items(template)
             self.compute_start_times()
+            self.template_stats.compute_stats(template)
 
     def display_template_items(self, template:Template):
         self._setup_items_table()
@@ -270,7 +278,6 @@ class TemplateConfiguration(widget, base):
             self._hour_headers[current_hour].setText(total_hour_time.toString("HH:mm:ss"))
 
 
-
     def set_template_table(self):
         self.twTemplates.clear()
         self.twTemplates.setRowCount(0)
@@ -329,6 +336,13 @@ class TemplateConfiguration(widget, base):
 
             self.show_templates(self.templates)
             self.display_template_items(self.current_template)
+            self.template_stats.compute_stats(self.current_template)
+
+    def on_stats(self):
+        if self.btnStats.isChecked():
+            self.wigStats.show()
+        else:
+            self.wigStats.hide()
 
 
     def load_templates_from_db(self):
@@ -354,8 +368,6 @@ class TemplateConfiguration(widget, base):
         self.twTemplates.setItem(row, 2, QTableWidgetItem(dow))
 
         return twi_name
-
-
 
     def _get_dow_names(self, dow: list):
         dow_names = []
@@ -452,7 +464,6 @@ class TemplateConfiguration(widget, base):
                 records.append(record)
         return records
 
-
     def read_tree_from_db(self):
         records = []
 
@@ -476,11 +487,16 @@ class TemplateConfiguration(widget, base):
     def build_tree(self, tree, item=None):
         for node in tree:
             if item is None:
-                item = QTreeWidgetItem([node.name])
+                node_name = f"{node.name} ({self.track_count(node.node_id)})"
+                item = QTreeWidgetItem([node_name])
+
+                #item = QTreeWidgetItem([node.name])
                 item.setData(0, Qt.ItemDataRole.UserRole, node.node_id)
                 self.build_tree(node.children, item)
             else:
-                child = QTreeWidgetItem([node.name])
+                node_name = f"{node.name} ({self.track_count(node.node_id)})"
+
+                child = QTreeWidgetItem([node_name])
                 child.setData(0, Qt.ItemDataRole.UserRole, node.node_id)
                 item.addChild(child)
                 if len(node.children) > 0:
@@ -490,9 +506,14 @@ class TemplateConfiguration(widget, base):
     def on_media_item_clicked(self, item:QTreeWidgetItem):
         node_id = item.data(0, Qt.ItemDataRole.UserRole)
         text = item.text(0)
+        text = text.split('(')[0].strip()
         self.item_clicked = "folder"
-        self.current_folder = {'id': node_id, 'name':text}
-
+        self.current_folder = {
+            'id': node_id, 
+            'name':text,
+            'avg_duration': self.track_avg_duration(node_id),
+            'track_count': self.track_count(node_id)
+            }
         self.show_tracks(node_id)
 
     def show_tracks(self, folder_id: int):
@@ -505,9 +526,7 @@ class TemplateConfiguration(widget, base):
        self.twTracks.setColumnWidth(3, 160)
        self.twTracks.setColumnWidth(4, 300)
        self.twTracks.setHorizontalHeaderLabels(["Title", "Artist", "Duration", "Track ID", "FilePath"])
-       #self.twTracks.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-       #tracks = dict(filter(lambda x: x[1].folder_id() == folder_id, self.tracks.items()))
        if folder_id not in self.tracks:
            return
 
@@ -522,7 +541,7 @@ class TemplateConfiguration(widget, base):
            track_title_twi.setData(Qt.ItemDataRole.UserRole, track.track_id())
            self.twTracks.setItem(row, 0, track_title_twi)
            self.twTracks.setItem(row, 1, QTableWidgetItem(track.artist_name()))
-           self.twTracks.setItem(row, 2, QTableWidgetItem(str(track.duration())))
+           self.twTracks.setItem(row, 2, QTableWidgetItem(str(track.formatted_duration())))
            self.twTracks.setItem(row, 3, QTableWidgetItem(track.formatted_track_id()))
            self.twTracks.setItem(row, 4, QTableWidgetItem(track.file_path()))
 
@@ -547,11 +566,14 @@ class TemplateConfiguration(widget, base):
                 self.show_message("No tracks in folder")
                 return
 
-            new_item = FolderItem(self.twMedia.currentItem().text(0))
+            new_item = FolderItem(self.current_folder['name'])
+
+            #new_item = FolderItem(self.twMedia.currentItem().text(0))
+
+            new_item.set_duration(self.current_folder['avg_duration'])
             new_item.set_folder_id(self.current_folder['id'])
             new_item.set_folder_name(self.current_folder['name'])
             new_item.set_item_row(item.row())
-
 
         if self.item_clicked == "track":
             if self.current_track.duration() == 0:
@@ -597,6 +619,10 @@ class TemplateConfiguration(widget, base):
         self.add_template_item(new_row, new_item)
 
         self.compute_start_times()
+
+        self.template_stats.update_stats(hour, self.current_template)
+
+        
 
     def add_template_item(self, row: int, item: "TemplateItem"):
 
@@ -671,8 +697,20 @@ class TemplateConfiguration(widget, base):
                 else:
                      folders[folder_id] = {}
                      folders[folder_id][track_reference] = track
-
         return folders
+
+    def track_count(self, folder_id:int) -> int:
+        if folder_id not in self.tracks:
+            return 0
+        return len(self.tracks[folder_id])
+
+    def track_avg_duration(self, folder_id:int) -> int:
+        if folder_id not in self.tracks:
+            return 0
+        total_duration = 0
+        for track in self.tracks[folder_id].values():
+            total_duration += track.duration()
+        return total_duration // len(self.tracks[folder_id])
 
     def show_message(self, message:str):
         msg = QMessageBox(self)

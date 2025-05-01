@@ -19,6 +19,12 @@ class MSSQLData:
 
         self.conn = None
 
+    def database(self):
+        return self._database
+    
+    def server(self):
+        return self._server
+
     def connect(self):
         try:
             self.conn = pyodbc.connect(self.conn_str)

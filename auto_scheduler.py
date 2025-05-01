@@ -42,6 +42,8 @@ class AutoScheduler(widget, base):
         self.create_statusbar()
 
         self.setWindowTitle("Auto-Scheduler")
+        self.status_bar = self.statusBar()
+        self.status_bar.showMessage("Ready")
 
     def create_actions(self):
         temp_icon = QIcon('icons/createbreak.bmp')
@@ -61,12 +63,12 @@ class AutoScheduler(widget, base):
         clock_template = TemplateConfiguration(self)
         self.mdi_area.addSubWindow(clock_template)
         clock_template.showMaximized()
+        self.status_bar.showMessage(f"Tracks Database: {clock_template.mssql_conn.database()}")
 
     def on_schedule(self):
         view_schedule = ViewScheduleDialog(self)
         self.mdi_area.addSubWindow(view_schedule)
         view_schedule.showMaximized()
-
 
     def create_toolbar(self):
         self.main_toolbar = self.addToolBar('Main')

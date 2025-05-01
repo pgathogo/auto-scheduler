@@ -44,6 +44,7 @@ class TemplateItem():
         self._item_title = item_title
         self._time_stamp = self.generate_time_stamp()    
         self._db_action = DBAction.NONE
+        self._schedule_db_action = DBAction.CREATE
         self._item_identifier = ""
         self._template_id = -1
         self._schedule_ref = -1
@@ -171,6 +172,12 @@ class TemplateItem():
     def set_db_action(self, action: DBAction):
         self._db_action = action
 
+    def schedule_db_action(self) -> DBAction:
+        return self._schedule_db_action
+    
+    def set_schedule_db_action(self, action: DBAction):
+        self._schedule_db_action = action
+
     def schedule_ref(self) -> int:
         return self._schedule_ref
     
@@ -190,13 +197,21 @@ class TemplateItem():
         return(f"{self._track_id:08d}")
 
     def generate_time_stamp(self) -> str:
-        #dt = datetime.datetime.now()
-        #return f"{dt.day}{dt.month}{dt.year}{dt.hour}{dt.minute}{dt.second}{dt.microsecond}"
         rand_letters = "".join(random.choices(string.ascii_letters, k=15))
         rand_ints = "".join(map(str, random.choices(range(100), k=18)))
         rand_bytes = os.urandom(15)
         hash_id = hashlib.sha256(rand_letters.encode()+rand_bytes+rand_ints.encode()).hexdigest()
         return hash_id[0:20]
+
+    def format_audio_len(self, audio_len: int) ->str:
+        seconds = audio_len // 1000
+        hours = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+    
+        # Format as "HH:MM:SS"
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
         
 
 class HeaderItem(TemplateItem):
@@ -228,7 +243,6 @@ class BlankItem(TemplateItem):
     def formatted_time(self):
         return ""
 
-
     def title(self) -> str:
         return self._title
 
@@ -246,6 +260,11 @@ class FolderItem(TemplateItem):
     def title(self) -> str:
         return ""
 
+    def duration(self):
+        return self._duration
+
+    def formatted_duration(self):
+        return self.format_audio_len(self.duration())
     # def folder_name(self) ->str:
     #     return self._title
 
@@ -273,16 +292,6 @@ class SongItem(TemplateItem):
     def formatted_duration(self):
         return self.format_audio_len(self.duration())
 
-    def format_audio_len(self, audio_len: int):
-        seconds = audio_len // 1000
-        hours = seconds // 3600
-        seconds %= 3600
-        minutes = seconds // 60
-        seconds %= 60
-    
-        # Format as "HH:MM:SS"
-        return f"{hours:02}:{minutes:02}:{seconds:02}"
-
     def artist_name(self) ->str:
         return self._artist_name
 
@@ -292,6 +301,7 @@ class CommercialBreakItem(TemplateItem):
         self._item_type = ItemType.COMMERCIAL_BREAK
         self._title = item_title
         self._booked_spots = -1
+        self._booked_duration = 0
 
     def make_item_identifier(self):
         ts = self.time_stamp()
@@ -305,6 +315,16 @@ class CommercialBreakItem(TemplateItem):
 
     def booked_spots(self) -> int:
         return self._booked_spots
+
+    def set_booked_duration(self, duration:int):
+        self._booked_duration = duration
+
+    def duration(self) -> int:
+        return self._booked_duration
+
+    def formatted_duration(self) ->str:
+        return self.format_audio_len(self.duration())
+
 
 class ScheduleItem(TemplateItem):
     def __init__(self, item_title:str=""):

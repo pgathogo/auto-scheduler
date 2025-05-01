@@ -53,3 +53,13 @@ class Track:
 
     def formatted_track_id(self) ->str:
         return(f"{self._track_id:08d}")
+
+    def formatted_duration(self) ->str:
+        seconds = self._duration // 1000
+        hours = seconds // 3600
+        seconds %= 3600
+        minutes = seconds // 60
+        seconds %= 60
+    
+        # Format as "HH:MM:SS"
+        return f"{hours:02}:{minutes:02}:{seconds:02}"

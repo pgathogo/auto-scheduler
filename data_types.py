@@ -73,6 +73,13 @@ class TrackColumns(IntEnum):
     FOLDER_ID = 5
     FILEPATH = 6
 
+class CommercialColumn(IntEnum):
+    SCHEDULE_DATE = 0
+    SCHEDULE_TIME = 1
+    SCHEDULE_HOUR = 2
+    BOOKED_SPOTS = 3
+    BOOKED_DURATION = 4
+
 
 def read_registry()->dict:
     access_reg = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)

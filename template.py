@@ -94,3 +94,7 @@ class Template:
         for item in self._template_items.values():
             if item.hour() == hour:
                 item.set_db_action(DBAction.DELETE)
+
+    def template_items_by_hour(self, hour:int) -> list:
+        items = [item for item in self._template_items.values() if item.hour() == hour]
+        return items
