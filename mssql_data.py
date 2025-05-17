@@ -54,7 +54,6 @@ class MSSQLData:
             return None
 
     def execute_non_query(self, query):
-        print(query)
         if not self.conn:
             if not self.connect():
                 return False

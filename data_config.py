@@ -38,7 +38,7 @@ class DataConfiguration:
     def _connect(self):
         return sqlite3.connect(self._database)
 
-    def save(self,  data: dict):
+    def save(self,  data: dict) -> bool:
         for template_name, template in data.items():
 
             template_id = -1

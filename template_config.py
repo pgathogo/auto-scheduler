@@ -100,13 +100,41 @@ class TemplateConfiguration(widget, base):
         # self.csv_data = CSVData()
         # self.tracks = self.csv_data.load_tracks()
 
+        icon = QIcon('icons/new.png')
+        self.btnNew.setIcon(icon)
+        self.btnNew.setIconSize(QSize(45, 40))
+
+        icon = QIcon('icons/edit_template.png')
+        self.btnEdit.setIcon(icon)
+        self.btnNew.setIconSize(QSize(45, 40))
+
+        icon = QIcon('icons/edit.png')
+        self.btnEdit.setIcon(icon)
+        self.btnEdit.setIconSize(QSize(35, 35))
+
+        icon = QIcon('icons/delete.png')
+        self.btnDeleteTemplate.setIcon(icon)
+        self.btnDeleteTemplate.setIconSize(QSize(35, 35))
+
+        icon = QIcon('icons/save.png')
+        self.btnSave.setIcon(icon)
+        self.btnSave.setIconSize(QSize(35, 35))
+
+        icon = QIcon('icons/summary.png')
+        self.btnStats.setIcon(icon)
+        self.btnStats.setIconSize(QSize(30, 30))
+
+        icon = QIcon('icons/create.png')
+        self.btnSchedule.setIcon(icon)
+        self.btnSchedule.setIconSize(QSize(30, 30))
+
         self.btnNew.clicked.connect(self.on_new)
         self.btnEdit.clicked.connect(self.on_edit)
         self.btnStats.clicked.connect(self.on_stats)
         self.btnSave.clicked.connect(self.on_save)
         self.btnSearch.clicked.connect(self.on_search)
         self.btnDeleteTemplate.clicked.connect(self.on_delete_template)
-        self.btnDeleteItem.clicked.connect(self.on_delete_template_item)
+        # self.btnDeleteItem.clicked.connect(self.on_delete_template_item)
 
         self.btnSchedule.clicked.connect(self.on_create_schedule)
 
@@ -157,6 +185,8 @@ class TemplateConfiguration(widget, base):
             self.display_template_items(template)
             self.compute_start_times()
             self.template_stats.compute_stats(template)
+
+        self.setWindowTitle(f"Template Designer - {self.current_template.name()}")
 
     def display_template_items(self, template:Template):
         self._setup_items_table()
@@ -423,6 +453,17 @@ class TemplateConfiguration(widget, base):
             self.wigSearch.hide()
 
     def on_delete_template(self):
+        if self.current_template is None:
+            return
+
+        print(f"Deleting template {self.current_template.name()}")
+
+        items = self.current_template.template_items()
+        item_count = [item for item in items.values() if item.item_type() == ItemType.SONG or item.item_type() == ItemType.FOLDER]
+        if len(item_count) > 0:
+            if not self.delete_template_confirmation():
+                return
+
         selected = self.twTemplates.selectedItems()
         if len(selected) > 0:
             name = selected[0].text()
@@ -431,7 +472,9 @@ class TemplateConfiguration(widget, base):
             #self.db_config.delete_template(template.id())
             #del self.templates[name]
             self.twTemplates.removeRow(selected[0].row())
-            self.show_templates(self.templates)
+            twi = self.twTemplates.item(self.twTemplates.rowCount()-1, 0)
+            self.twTemplates.setCurrentItem(twi, QItemSelectionModel.SelectCurrent)
+            # self.show_templates(self.templates)
 
     def on_delete_template_item(self):
         selected = self.twItems.selectedItems()
@@ -719,6 +762,20 @@ class TemplateConfiguration(widget, base):
         msg.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg.exec_()
 
+    def delete_template_confirmation(self):
+        msgbox = QMessageBox(self)
+        msgbox.setWindowTitle("Delete Template")
+        msgbox.setText(f"Template `{self.current_template.name()}` has items")
+        msgbox.setInformativeText("Do you want to delete the template?")
+        msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msgbox.setDefaultButton(QMessageBox.No)
+
+        ret = msgbox.exec_()
+
+        if ret == QMessageBox.Yes:
+            return True
+        else:
+            return False
 
         
             

@@ -25,58 +25,56 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QPushButton" name="btnNew">
+        <widget class="QToolButton" name="btnNew">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
           <string>New Template</string>
          </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="btnEdit">
-         <property name="minimumSize">
+         <property name="iconSize">
           <size>
-           <width>90</width>
+           <width>45</width>
            <height>40</height>
           </size>
          </property>
-         <property name="text">
-          <string>Edit...</string>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnCopy">
+        <widget class="QToolButton" name="btnEdit">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
-          <string>Copy...</string>
+          <string>Edit Template</string>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnDeleteTemplate">
+        <widget class="QToolButton" name="btnDeleteTemplate">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
-         <property name="styleSheet">
-          <string notr="true">background-color: rgb(202, 0, 0);
-color: rgb(255, 255, 255);</string>
-         </property>
          <property name="text">
-          <string>Delete...</string>
+          <string>Delete Template</string>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
@@ -88,31 +86,37 @@ color: rgb(255, 255, 255);</string>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnStats">
+        <widget class="QToolButton" name="btnSave">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
-          <string>Show Stats</string>
+          <string>Save Template</string>
          </property>
-         <property name="checkable">
-          <bool>true</bool>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnSave">
+        <widget class="QToolButton" name="btnStats">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
-          <string>Save</string>
+          <string>Show Summary</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
@@ -130,32 +134,22 @@ color: rgb(255, 255, 255);</string>
         </spacer>
        </item>
        <item>
-        <widget class="QPushButton" name="btnSchedule">
+        <widget class="QToolButton" name="btnSchedule">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
-          <string>Create Schedule...</string>
+          <string>Create Schedule</string>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
       </layout>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btnDeleteItem">
-       <property name="minimumSize">
-        <size>
-         <width>90</width>
-         <height>40</height>
-        </size>
-       </property>
-       <property name="text">
-        <string>Delete Item</string>
-       </property>
-      </widget>
      </item>
     </layout>
    </item>

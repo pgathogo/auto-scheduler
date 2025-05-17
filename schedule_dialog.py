@@ -18,7 +18,15 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import (
     QDate,
     Qt,
-    QTime
+    QTime,
+    QSize,
+    QThread,
+    QCoreApplication
+)
+
+from PyQt5.QtGui import (
+    QIcon,
+    QPalette
 )
 
 from template import Template
@@ -37,6 +45,8 @@ from template_item import (
 )
 
 from data_config import DataConfiguration
+
+from schedule_updater import ScheduleUpdater
 
 
 widget, base = uic.loadUiType('schedule_dialog.ui')
@@ -58,6 +68,14 @@ class ScheduleDialog(widget, base):
         self.db_config = DataConfiguration("data/templates.db")
         self.mssql_conn = self._make_mssql_connection()
 
+        icon = QIcon('icons/generate.png')
+        self.btnGenerate.setIcon(icon)
+        self.btnGenerate.setIconSize(QSize(35, 35))
+
+        icon = QIcon('icons/save.png')
+        self.btnSave.setIcon(icon)
+        self.btnSave.setIconSize(QSize(35, 35))
+
         self.btnGenerate.clicked.connect(self.on_generate_schedule)
         self.btnSave.clicked.connect(self.on_save_schedule)
 
@@ -74,6 +92,9 @@ class ScheduleDialog(widget, base):
         self.spVert.setSizes([300, 700])
 
         self.setWindowTitle(f"Template: {self._template.name()} - Days of Week: {self.dow_text(self._template.dow())}")
+
+        self.lblProgresText.setVisible(False)
+
 
     def dow_text(self, dow: list) -> str:
         dow_text = {
@@ -216,6 +237,12 @@ class ScheduleDialog(widget, base):
         self.tableWidget.setHorizontalHeaderLabels(["Time", "Title", "Artist", "Duration", "Actions"])
 
     def on_generate_schedule(self):
+
+        self.clear_generated_schedule()
+
+        print("Generating schedule...")
+        print(f"Cache size - BEFORE: {len(self._daily_schedule)}")
+
         start_date = self.edtStartDate.date()
         dflt_start_date = start_date
         end_date = self.edtEndDate.date()
@@ -249,6 +276,13 @@ class ScheduleDialog(widget, base):
         self._populate_schedule_table(items)
 
         self.selected_date_str = sdate
+        print(f"Cache size - AFTER: {len(self._daily_schedule)}")
+
+    def clear_generated_schedule(self):
+        self._daily_schedule.clear()
+        self._initialize_schedule_table()
+        self._initialize_dates_table()
+        self._setup_table_widget()
 
         
     def _populate_schedule_table(self, items: dict):
@@ -294,6 +328,8 @@ class ScheduleDialog(widget, base):
                 # appropriately (e.g., log a message, skip the item, etc.)
                 if track is None:
                     continue
+
+                print(f"Track: {track.title()}")
 
                 track_item = SongItem(track.title())
                 track_item.set_artist_id(track.artist_id())
@@ -508,6 +544,7 @@ class ScheduleDialog(widget, base):
         return int(schedule_ref)
         
     def on_save_schedule(self):
+
        if self.schedule_is_saved:
            self.show_message("Schedule already saved!")
            return
@@ -515,77 +552,74 @@ class ScheduleDialog(widget, base):
        if len(self._daily_schedule) == 0:
            self.show_message("No schedule to save!")
            return
-    
-       schedule_ref = self.get_schedule_ref()
 
-       mssql_stmts = []
-       sqlite_stmts = []
+       if not self.confirm_save():
+           return
 
-       for sched_date, schedule_items in self._daily_schedule.items():
-           mssql_seq = 0
-           sqlite_seq = 0
-           for key, item in schedule_items.items():
+       self.schedule_updater = ScheduleUpdater(self._daily_schedule)
+       self.updater_thread = QThread(self)
+       self.schedule_updater.moveToThread(self.updater_thread)
 
-               if item.item_type() == ItemType.EMPTY:
-                   continue
+       # Connect updater signals
+       self.schedule_updater.update_started.connect(self.schedule_update_started)
+       self.schedule_updater.update_progress.connect(self.schedule_update_progress)
+       self.schedule_updater.update_completed.connect(self.schedule_update_completed)
 
-               if item.item_type() == ItemType.COMMERCIAL_BREAK:
-                   continue
+       self.updater_thread.started.connect(self.updater_thread_started)
+       self.updater_thread.finished.connect(self.updater_thread.deleteLater)
 
-               if item.item_type() == ItemType.HEADER:
-                   sqlite_seq += 1
-                   sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
-                   sqlite_stmts.append(sqlite_schedule_record)
-                   continue
-
-               mssql_seq += 1
-               mssql_schedule_record = self._make_mssql_schedule_record(sched_date, schedule_ref, item, mssql_seq)
-               mssql_stmts.append(mssql_schedule_record)
-
-               sqlite_seq += 1
-               sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
-               sqlite_stmts.append(sqlite_schedule_record)
+       self.updater_thread.start()
 
 
-       # MSSQL supports multiple statment execution
-       mssql_all = "".join(mssql_stmts)
-       self.mssql_conn.execute_non_query(mssql_all)
-    
-       # SQLite supports single statement execution
-       for stmt in sqlite_stmts:
-           self.db_config.execute_query(stmt)
+    def confirm_save(self) ->bool:
+        msgbox = QMessageBox(self)
+        msgbox.setWindowTitle("Generate Schedule")
+        msgbox.setText(f"Generate schedule will be save permanently.")
+        msgbox.setInformativeText("Do you want to continue?")
+        msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        msgbox.setDefaultButton(QMessageBox.No)
 
-       self.schedule_is_saved = True
-       self.show_message("Schedule saved successfully!")
+        ret = msgbox.exec_()
 
-    def _make_mssql_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
-        status = 'CUED'
-        item_source = 'SONG'
-        comm_audio = 'AUDIO'
+        if ret == QMessageBox.Yes:
+            return True
+        else:
+            return False
 
-        ins_stmt = (f" Insert into schedule (ScheduleService, ScheduleLineRef, ScheduleDate, "
-                    f" ScheduleTime, ScheduleHour, ScheduleHourTime, ScheduleTrackReference, "
-                    f" ScheduledFadeIn, ScheduledFadeOut, ScheduledFadeDelay, PlayStatus, "
-                    f" AutoTransition, LiveTransition, ItemSource, ScheduleCommMediaType )"
-                    f" VALUES ({1}, {schedule_ref}, CONVERT(DATETIME, '{sched_date}', 102), "
-                    f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
-                    f" {seq}, {item.track_id()}, {0}, {0}, {0}, '{status}', {1}, {1}, '{item_source}', '{comm_audio}');"
-                    )
+    def updater_thread_started(self):
+        self.schedule_updater.exec_()
 
-        return ins_stmt
+    def schedule_update_started(self):
+        self.btnSave.setEnabled(False)
+        self.lblProgresText.setVisible(True)
+        self.lblProgresText.setText("Saving started.")
+        print("Saving started.")
 
-    def _make_sqlite_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
-        ins_stmt = (f" Insert into schedule ( schedule_ref, schedule_date, template_id, start_time, "
-                    f" schedule_hour, item_identifier, item_type, duration, title, artist_id, artist_name, "
-                    f" folder_id, folder_name, track_id, filepath, item_row )"
-                    f" VALUES ({schedule_ref}, '{sched_date}', {item.template_id()}, "
-                    f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
-                    f" '{item.item_identifier()}', {int(item.item_type())}, {item.duration()}, "
-                    f" '{item.title()}', {item.artist_id()}, '{item.artist_name()}', "
-                    f" {item.folder_id()}, '{item.folder_name()}', {item.track_id()}, "
-                    f" '{item.item_path()}', {seq}); ")
+        QCoreApplication.processEvents()
 
-        return ins_stmt
+
+    def schedule_update_progress(self, info_id, msg):
+        if info_id == 0: # Information
+            self.lblProgresText.setStyleSheet("color: black")
+
+        if info_id == 1: # Warning
+            self.lblProgresText.setStypeSheet("color: yellow")
+
+        if info_id == 2: # Error
+            self.lblProgresText.setStyleSheet("color: red")
+
+        self.lblProgresText.setText(msg)
+        QCoreApplication.processEvents()
+
+
+    def schedule_update_completed(self, status: bool):
+        self.btnSave.setEnabled(True)
+        self.lblProgresText.setVisible(False)
+        if status:
+            self.lblProgresText.setText("Schedule saved successfully!")
+            self.show_message("Schedule saved successfully!")
+        else:
+            self.lblProgresText.setText("Schedule save failed!")
 
     def show_message(self, message:str):
         msg = QMessageBox(self)

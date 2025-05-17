@@ -64,28 +64,34 @@
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout">
        <item>
-        <widget class="QPushButton" name="btnGenerate">
+        <widget class="QToolButton" name="btnGenerate">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
-          <string>Generate </string>
+          <string>Generate Schedule</string>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="btnSave">
+        <widget class="QToolButton" name="btnSave">
          <property name="minimumSize">
           <size>
-           <width>90</width>
-           <height>40</height>
+           <width>80</width>
+           <height>60</height>
           </size>
          </property>
          <property name="text">
-          <string>Save</string>
+          <string>Save Schedule</string>
+         </property>
+         <property name="toolButtonStyle">
+          <enum>Qt::ToolButtonTextUnderIcon</enum>
          </property>
         </widget>
        </item>
@@ -143,7 +149,7 @@
      <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <item>
-        <widget class="QLabel" name="label_5">
+        <widget class="QLabel" name="lblSched">
          <property name="text">
           <string>Schedule</string>
          </property>
@@ -158,6 +164,17 @@
           <enum>QAbstractItemView::SelectRows</enum>
          </property>
         </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="hlProgress">
+         <item>
+          <widget class="QLabel" name="lblProgresText">
+           <property name="text">
+            <string>TextLabel</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
       </layout>
      </widget>
