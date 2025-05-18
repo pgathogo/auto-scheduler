@@ -92,6 +92,8 @@ class TemplateConfiguration(widget, base):
         self.current_folder = None
         self.current_track = None
 
+        self.folder_names = {}
+
         self.db_config = DataConfiguration("data/templates.db")
         self.mssql_conn = self._make_mssql_connection()
 
@@ -134,7 +136,10 @@ class TemplateConfiguration(widget, base):
         self.btnSave.clicked.connect(self.on_save)
         self.btnSearch.clicked.connect(self.on_search)
         self.btnDeleteTemplate.clicked.connect(self.on_delete_template)
-        # self.btnDeleteItem.clicked.connect(self.on_delete_template_item)
+
+        self.edtTitle.returnPressed.connect(self.on_audio_search)
+        self.edtArtist.returnPressed.connect(self.on_audio_search)
+        self.btnAudioSearch.clicked.connect(self.on_audio_search)
 
         self.btnSchedule.clicked.connect(self.on_create_schedule)
 
@@ -153,6 +158,7 @@ class TemplateConfiguration(widget, base):
         self.twItems.itemDoubleClicked.connect(self.on_item_double_clicked)
 
         self.tracks = self.load_tracks()
+
         self.tracks_avg = {}
         self.create_media_folders()
 
@@ -164,6 +170,7 @@ class TemplateConfiguration(widget, base):
         self.load_templates_from_db()
 
         self.template_stats = TemplateStatistics(self.twStats)   
+
 
 
     def _make_mssql_connection(self):
@@ -452,6 +459,57 @@ class TemplateConfiguration(widget, base):
         else:
             self.wigSearch.hide()
 
+    def on_audio_search(self):
+
+        title = self.edtTitle.text()
+        artist = self.edtArtist.text()
+
+        title_search = ""
+        artist_search = ""
+
+        if title.strip() =="":
+            title_search = f"'%{title.strip()}%'"
+        else:
+            title_search = f"'%{title}%'"
+
+        if artist.strip() =="":
+            artist_search = f"'%{artist.strip()}%'"
+        else:
+            artist_search = f"'%{artist}%'"
+        
+        mssql_conn = self._get_mssql_connection()
+
+        if mssql_conn.connect():
+            sql = (f"SELECT TrackReference, TrackTitle, ArtistSearch, Duration, ArtistID_1, FolderID, FilePath "
+                    f" FROM Tracks "
+                   f" WHERE TrackTitle LIKE {title_search} "
+                     f" AND ArtistSearch LIKE {artist_search} "
+                   f" ORDER by TrackReference ")
+            
+            rows = mssql_conn.execute_query(sql)
+            tracks = {}
+            for row in rows:
+                track_reference = int(row[int(TrackColumns.TRACK_REFERENCE)])
+                track = Track(track_reference)
+                track.set_title(row[TrackColumns.TRACK_TITLE])
+                track.set_artist_name(row[TrackColumns.ARTIST_SEARCH])
+                track.set_duration(int(row[TrackColumns.DURATION]))
+
+                track.set_artist_id(int(row[TrackColumns.ARTISTID_1]))
+
+                folder_id = int(row[TrackColumns.FOLDER_ID])
+                track.set_folder_id(folder_id)
+                track.set_file_path(row[TrackColumns.FILEPATH])
+
+                tracks[track_reference] = track
+
+            self.prepare_tracks_table()
+            self.display_tracks(tracks)
+
+
+        
+
+
     def on_delete_template(self):
         if self.current_template is None:
             return
@@ -533,11 +591,15 @@ class TemplateConfiguration(widget, base):
                 node_name = f"{node.name} ({self.track_count(node.node_id)})"
                 item = QTreeWidgetItem([node_name])
 
+                self.folder_names[node.node_id] = node_name
+
+
                 #item = QTreeWidgetItem([node.name])
                 item.setData(0, Qt.ItemDataRole.UserRole, node.node_id)
                 self.build_tree(node.children, item)
             else:
                 node_name = f"{node.name} ({self.track_count(node.node_id)})"
+                self.folder_names[node.node_id] = node_name
 
                 child = QTreeWidgetItem([node_name])
                 child.setData(0, Qt.ItemDataRole.UserRole, node.node_id)
@@ -559,7 +621,7 @@ class TemplateConfiguration(widget, base):
             }
         self.show_tracks(node_id)
 
-    def show_tracks(self, folder_id: int):
+    def prepare_tracks_table(self):
        self.twTracks.clear()
        self.twTracks.setRowCount(0)
        self.twTracks.setColumnCount(5)
@@ -570,13 +632,18 @@ class TemplateConfiguration(widget, base):
        self.twTracks.setColumnWidth(4, 300)
        self.twTracks.setHorizontalHeaderLabels(["Title", "Artist", "Duration", "Track ID", "FilePath"])
 
+    def show_tracks(self, folder_id: int):
+       self.prepare_tracks_table()
+
        if folder_id not in self.tracks:
            return
-
        tracks = self.tracks[folder_id]
        if len(tracks) == 0:
               return
 
+       self.display_tracks(tracks)
+
+    def display_tracks(self, tracks: dict):
        for track_ref, track in tracks.items():
            row = self.twTracks.rowCount()
            self.twTracks.insertRow(row)
@@ -593,7 +660,22 @@ class TemplateConfiguration(widget, base):
         if len(selected) > 0:
             self.item_clicked = "track"
             track_id = selected[0].data(Qt.ItemDataRole.UserRole)
+            self.current_folder = self.get_current_folder_by_track_id(track_id)
+            if self.current_folder is None:
+                return
             self.current_track = self.tracks[self.current_folder['id']][track_id]
+
+    def get_current_folder_by_track_id(self, track_id: int) ->dict:
+        for folder_id, tracks in self.tracks.items():
+            if track_id in tracks:
+                folder = {
+                    'id': folder_id, 
+                    'name':self.folder_names[folder_id],
+                    'avg_duration': self.track_avg_duration(folder_id),
+                    'track_count': self.track_count(folder_id)
+                    }
+                return folder
+        return None
 
     def on_item_double_clicked(self, item:QTableWidgetItem):
         new_item = None
@@ -706,15 +788,19 @@ class TemplateConfiguration(widget, base):
         self.main_window.mdi_area.addSubWindow(schedule_dlg)
         schedule_dlg.showMaximized()
 
-    def load_tracks(self) -> dict:
-        folders = {}
-
+    def _get_mssql_connection(self):
         server = MSSQL_CONN['server']
         database = MSSQL_CONN['database']
         username = MSSQL_CONN['username']  
         password = MSSQL_CONN['password']
 
-        mssql =  MSSQLData(server, database, username, password)
+        return MSSQLData(server, database, username, password)
+
+    def load_tracks(self) -> dict:
+        folders = {}
+
+        mssql = self._get_mssql_connection()
+
         if mssql.connect():
             sql = (f"Select TrackReference, TrackTitle, ArtistSearch, Duration, ArtistID_1, FolderID, FilePath "
                    f" from Tracks "
