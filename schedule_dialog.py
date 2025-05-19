@@ -35,7 +35,8 @@ from mssql_data import MSSQLData
 from data_types import (
     MSSQL_CONN,
     ItemType,
-    CommercialColumn
+    CommercialColumn,
+    DBAction
 )
 
 from template_item import (
@@ -241,7 +242,6 @@ class ScheduleDialog(widget, base):
         self.clear_generated_schedule()
 
         print("Generating schedule...")
-        print(f"Cache size - BEFORE: {len(self._daily_schedule)}")
 
         start_date = self.edtStartDate.date()
         dflt_start_date = start_date
@@ -260,7 +260,13 @@ class ScheduleDialog(widget, base):
             template_items = list(self._template.template_items().values())
 
             # Remove empty items
-            schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY]
+            schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY 
+                              and item.db_action() != DBAction.DELETE]
+
+            schedule_items.sort(key=lambda item: item.item_row())
+
+            for item in schedule_items:
+                print(f"Title: {item.title()} : Row: {item.item_row()}")
 
             processed_items = self._convert_category_to_track(schedule_items)
             appended_list = self._append_comm_breaks(comm_break_items, processed_items)
@@ -276,7 +282,6 @@ class ScheduleDialog(widget, base):
         self._populate_schedule_table(items)
 
         self.selected_date_str = sdate
-        print(f"Cache size - AFTER: {len(self._daily_schedule)}")
 
     def clear_generated_schedule(self):
         self._daily_schedule.clear()

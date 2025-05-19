@@ -821,11 +821,11 @@ class TemplateConfiguration(widget, base):
                 track.set_folder_id(folder_id)
                 track.set_file_path(row[TrackColumns.FILEPATH])
 
-                if folder_id in folders:
-                    folders[folder_id][track_reference] = track
-                else:
+                if folder_id not in folders:
                      folders[folder_id] = {}
-                     folders[folder_id][track_reference] = track
+
+                folders[folder_id][track_reference] = track
+
         return folders
 
     def track_count(self, folder_id:int) -> int:

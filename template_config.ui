@@ -198,6 +198,9 @@
         <column/>
        </widget>
        <widget class="QTableWidget" name="twItems">
+        <property name="editTriggers">
+         <set>QAbstractItemView::NoEditTriggers</set>
+        </property>
         <property name="selectionMode">
          <enum>QAbstractItemView::SingleSelection</enum>
         </property>
