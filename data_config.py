@@ -228,16 +228,36 @@ class DataConfiguration:
             con.commit()
             con.close()
 
-    def execute_query(self, sql_stmt: str):
+    def execute_query(self, sql_stmt: str) -> bool:
         con = self._connect()
         curs = con.cursor()
+        result = True
+        try:
+            curs.execute(sql_stmt)
+            result = True
+        except:
+            print(f"Error executing query {sql_stmt}")
+            result = False
+        finally:
+            con.commit()
+            con.close()
+            return result
+
+    def fetch_data(self, sql_stmt: str) -> list:
+        con = self._connect()
+        curs = con.cursor()
+
         try:
             curs.execute(sql_stmt)
         except:
             print(f"Error executing query {sql_stmt}")
-        finally:
-            con.commit()
             con.close()
+            return []
+
+        rows = curs.fetchall()
+        con.close()
+
+        return rows
 
     def fetch_all_templates(self) ->dict:
         templates = {}

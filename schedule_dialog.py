@@ -263,12 +263,14 @@ class ScheduleDialog(widget, base):
             schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY 
                               and item.db_action() != DBAction.DELETE]
 
+            # Maintain the order of items in the template based on how they were inserted
             schedule_items.sort(key=lambda item: item.item_row())
 
             for item in schedule_items:
                 print(f"Title: {item.title()} : Row: {item.item_row()}")
 
             processed_items = self._convert_category_to_track(schedule_items)
+
             appended_list = self._append_comm_breaks(comm_break_items, processed_items)
 
             self._cache_generated_schedule(start_date, appended_list)
@@ -324,6 +326,8 @@ class ScheduleDialog(widget, base):
         for item in schedule_items:
 
             if item.item_type() != ItemType.FOLDER:
+                print(f"Item: {item.title()} - Type: {item.item_type()}")
+            
                 s_items.append(item)
             else:
 
@@ -333,8 +337,6 @@ class ScheduleDialog(widget, base):
                 # appropriately (e.g., log a message, skip the item, etc.)
                 if track is None:
                     continue
-
-                print(f"Track: {track.title()}")
 
                 track_item = SongItem(track.title())
                 track_item.set_artist_id(track.artist_id())

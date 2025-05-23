@@ -43,6 +43,10 @@ class ScheduleUpdater(QObject):
         msg = f"Saving schedule reference: {schedule_ref}"
         self.update_progress.emit(0, msg)
 
+        unique_hours_per_date = self.extract_unique_hours_per_date(self.schedule)
+        
+        self.remove_existing_hours(unique_hours_per_date)
+
         for sched_date, schedule_items in self.schedule.items():
            mssql_seq = 0
            sqlite_seq = 0
@@ -110,6 +114,88 @@ class ScheduleUpdater(QObject):
             )
 
         return int(schedule_ref)
+
+
+    def extract_unique_hours_per_date(self, schedule: dict):
+        dates = {}
+        for sched_date, schedule_items in schedule.items():
+            hours = {}
+            for key, items in schedule_items.items():
+                if items.hour() in hours:
+                    hours[items.hour()] += 1
+                else:
+                    hours[items.hour()] = 0
+            dates[sched_date] = hours
+        return dates
+
+
+    def remove_existing_hours(self, hours_per_date: dict) -> bool:
+        for date, hours in hours_per_date.items():
+            hrs = list(hours.keys())
+
+            hr_refs = self._get_schedule_ref(date, hrs)
+            if len(hr_refs[date]) == 0:
+                continue
+            
+            del_stmt_mssql = self._make_delete_statement_mssql(date, hr_refs[date])
+
+            del_stmt_sqlite = self._make_delete_statement_sqlite(date, hr_refs[date])
+
+            # Execute statements
+            if self.mssql_conn.execute_non_query(del_stmt_mssql):
+                msg = f"Deleted {len(hrs)} hours from date {date} in Sedric database"
+                self.update_progress.emit(0, msg)
+
+                if not self.db_config.execute_query(del_stmt_sqlite):
+                    msg = f"Error deleting {len(hrs)} hours from date {date} in local database"
+                    self.update_progress.emit(0, msg)
+                    return False
+
+        return True
+
+
+    def _get_schedule_ref(self, date: str, hrs: list) -> dict:
+        # Fetch data from sqlite table schedule and retun a dict of
+        # {date: {hour: schedule_ref}}
+        sql = (f"SELECT schedule_ref, schedule_hour "
+               f"FROM schedule WHERE schedule_date = '{date}' "
+               f" AND schedule_hour in ({','.join(str(h) for h in hrs)});" )
+        
+        SCHED_REF = 0
+        SCHED_HOUR = 1
+
+        rows = self.db_config.fetch_data(sql)
+
+        if not rows:
+            return {date: {}}
+
+        schedule_ref = {}
+
+        for row in rows:
+            if row[SCHED_HOUR] not in schedule_ref:
+                schedule_ref[row[SCHED_HOUR]] = row[SCHED_REF]
+            else:
+                continue
+        return {date: schedule_ref}
+
+
+    def _make_delete_statement_mssql(self, date: str, hr_ref: list) ->str:
+        refs = list(hr_ref.values())
+        sched_refs = ",".join(str(r) for r in refs)
+
+        del_stmt = (f"DELETE from Schedule "
+                    f"WHERE ScheduleDate = '{date}'"
+                    f" AND ScheduleLineRef in ({sched_refs});")
+        return del_stmt
+
+    def _make_delete_statement_sqlite(self, date: str, hr_refs: list) ->str:
+        hrs = list(hr_refs.keys())
+        hr_str = ",".join(str(h) for h in hrs)
+
+        del_stmt = (f"DELETE from Schedule "
+                    f"WHERE schedule_date = '{date}'"
+                    f" AND Schedule_hour in ({hr_str});")
+        return del_stmt
 
     def _make_mssql_connection(self):
         server = MSSQL_CONN['server']

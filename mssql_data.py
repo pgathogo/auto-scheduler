@@ -53,7 +53,7 @@ class MSSQLData:
             print(f"Error executing query: {sqlstate}")
             return None
 
-    def execute_non_query(self, query):
+    def execute_non_query(self, query) ->bool:
         if not self.conn:
             if not self.connect():
                 return False
@@ -61,9 +61,10 @@ class MSSQLData:
         try:
             cursor.execute(query)
             self.conn.commit()
-            return True
         except pyodbc.Error as ex:
             sqlstate = ex.args[0]
             print(f"Error executing non-query: {sqlstate}")
             return False
+
+        return True
             
