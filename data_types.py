@@ -5,6 +5,10 @@ from enum import (
     IntEnum
 )
 
+from PyQt5.QtWidgets import (
+    QComboBox
+)
+
 class ItemType(IntEnum):
     EMPTY = -1
     HEADER = 0
@@ -44,6 +48,8 @@ class TemplateItemColumns(IntEnum):
     ITEM_IDENTIFIER=12
     TEMPLATE_ID=13
     FOLDER_NAME=14
+    ROTATION=15
+    GENRE=16
 
 class ScheduleColumns(IntEnum):
     ID = 0
@@ -72,6 +78,7 @@ class TrackColumns(IntEnum):
     ARTISTID_1 = 4
     FOLDER_ID = 5
     FILEPATH = 6
+    GENRE = 7
 
 class CommercialColumn(IntEnum):
     SCHEDULE_DATE = 0
@@ -79,6 +86,28 @@ class CommercialColumn(IntEnum):
     SCHEDULE_HOUR = 2
     BOOKED_SPOTS = 3
     BOOKED_DURATION = 4
+
+
+class RotationComboBox(QComboBox):
+    def __init__(self, item: "TemplateItem"):
+        super(RotationComboBox, self).__init__()
+        self.add_items()
+        self.set_current_index(item.rotation())
+        self.item = item
+
+    def add_items(self):
+        self.addItem("None", "N")
+        self.addItem("Random", "R")
+
+    def set_current_index(self, rotation: str):
+        index = self.findData(rotation)
+        self.setCurrentIndex(index)
+
+    def on_current_index_changed(self, index: int):
+        if index == 0:
+            self.item.set_rotation("N")
+        elif index == 1:
+            self.item.set_rotation("R")
 
 
 def read_registry()->dict:

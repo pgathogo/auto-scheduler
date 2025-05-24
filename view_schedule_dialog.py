@@ -28,6 +28,7 @@ class ViewScheduleDialog(widget, base):
         self.edtDate.setDate(QDate.currentDate())
 
         self.edtDate.dateChanged.connect(self.on_date_changed)
+        self.show_schedule_by_date(self.edtDate.date())
 
     def on_date_changed(self, date: QDate):
         self.show_schedule_by_date(date)

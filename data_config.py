@@ -98,7 +98,7 @@ class DataConfiguration:
                     f" Where id={template.id()};"
                     )
 
-        print(f'Updating template {template.name()}...')
+        print(f'Updating template `{template.name()}`...')
         try:
             curs.execute(upd_stmt)
         except:
@@ -175,11 +175,17 @@ class DataConfiguration:
             item_row = item.item_row()
             item_identifier = item.item_identifier()
             folder_name = item.folder_name()
+            rotation = item.rotation()
+            genre = item.genre()
+
+            print(f"Title: {title}: Rotation: {rotation} - Genre: {genre}")
             
             ins_stmt = (f'Insert into templateitem ("item_type", "start_time", "hour", "duration", "title","artist_name", "artist_id", '
-                   f'"folder_id", "item_path", "item_id", "item_row", "item_identifier", "template_id", "folder_name") VALUES '
+                   f'"folder_id", "item_path", "item_id", "item_row", "item_identifier", "template_id", "folder_name", "rotation", "genre") VALUES '
                    f' ({item_type},"{start_time}",{hour},{duration},"{title}","{artist_name}", {artist_id},{folder_id}, '
-                   f' "{item_path}",{track_id}, {item_row},"{item_identifier}",{template_id}, "{folder_name}" ) RETURNING id;' )
+                   f' "{item_path}",{track_id}, {item_row},"{item_identifier}", {template_id}, "{folder_name}", '
+                   f' "{rotation}", {genre}) RETURNING id;' )
+
 
             new_id = -1
             try:
@@ -196,10 +202,15 @@ class DataConfiguration:
         con = self._connect()
         curs = con.cursor()
 
+
         start_time = item.start_time().toString("hh:mm:ss")
         item_row = item.item_row()
 
-        upd_stmt = (f'Update templateitem set "start_time"="{start_time}", "item_row"={item_row}, '
+        print(f"Start Time {start_time}: Item Title: {item.title()} - Rotation: {item.rotation()}")
+
+        upd_stmt = (f'Update templateitem set "start_time"="{start_time}", '
+                    f' "item_row"={item_row}, '
+                    f' "rotation"="{item.rotation()}" '
                     f'Where id={item.id()};'
                 )
 
@@ -292,10 +303,8 @@ class DataConfiguration:
 
         sel_stmt = (f"Select id, item_type, start_time, hour, duration, title, "
                     f" artist_id, artist_name, folder_id, item_path, item_id, "
-                    f" item_row, item_identifier, template_id, folder_name "
-                    f" From templateitem Where template_id = {template.id()} order by hour, item_row;"
-                
-        )
+                    f" item_row, item_identifier, template_id, folder_name, rotation, genre "
+                    f" From templateitem Where template_id = {template.id()} order by hour, item_row;")
 
         curs.execute(sel_stmt)
 
@@ -326,7 +335,6 @@ class DataConfiguration:
         return True if len(rows) > 0 else False
 
 
-
     def _make_template_item(self, db_record):
         id = int(db_record[int(TemplateItemColumns.ID)])
         item_type = ItemType(db_record[int(TemplateItemColumns.ITEM_TYPE)])
@@ -343,6 +351,8 @@ class DataConfiguration:
         item_identifier = db_record[int(TemplateItemColumns.ITEM_IDENTIFIER)]
         template_id = int(db_record[int(TemplateItemColumns.TEMPLATE_ID)])
         folder_name = db_record[int(TemplateItemColumns.FOLDER_NAME)]
+        rotation = db_record[int(TemplateItemColumns.ROTATION)]
+        genre = db_record[int(TemplateItemColumns.GENRE)]
 
         template_item = None
 
@@ -377,7 +387,8 @@ class DataConfiguration:
         template_item.set_folder_name(folder_name)
         template_item.set_db_action(DBAction.NONE)
         template_item.set_item_type(item_type)
-        
+        template_item.set_rotation(rotation)
+        template_item.set_genre(genre)
 
         return template_item
 

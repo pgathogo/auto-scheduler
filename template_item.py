@@ -49,6 +49,8 @@ class TemplateItem():
         self._template_id = -1
         self._schedule_ref = -1
         self._schedule_date = QDate(0,0,0)
+        self._rotation = "N"
+        self._genre = -1
 
         self.make_item_identifier()
 
@@ -190,6 +192,18 @@ class TemplateItem():
     def set_schedule_date(self, date: QDate):
         self._schedule_date = date
 
+    def rotation(self) ->str:
+        return self._rotation
+
+    def set_rotation(self, rot: str):
+        self._rotation = rot
+
+    def set_genre(self, genre: int):
+        self._genre = genre
+
+    def genre(self) -> int:
+        return self._genre
+
     def formatted_date(self) -> str:
         return self._schedule_date.toString("dd/MM/yyyy")
 
@@ -294,6 +308,13 @@ class SongItem(TemplateItem):
 
     def artist_name(self) ->str:
         return self._artist_name
+
+    def genre(self) -> int:
+        return self._genre
+
+    def set_genre(self, genre: int):
+        self._genre = genre
+
 
 class CommercialBreakItem(TemplateItem):
     def __init__(self, item_title:str=""):

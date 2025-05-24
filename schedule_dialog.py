@@ -49,6 +49,7 @@ from data_config import DataConfiguration
 
 from schedule_updater import ScheduleUpdater
 
+GENRE_ROTATION = {"N": "NONE", "R": "RANDOM"}
 
 widget, base = uic.loadUiType('schedule_dialog.ui')
 
@@ -266,9 +267,6 @@ class ScheduleDialog(widget, base):
             # Maintain the order of items in the template based on how they were inserted
             schedule_items.sort(key=lambda item: item.item_row())
 
-            for item in schedule_items:
-                print(f"Title: {item.title()} : Row: {item.item_row()}")
-
             processed_items = self._convert_category_to_track(schedule_items)
 
             appended_list = self._append_comm_breaks(comm_break_items, processed_items)
@@ -280,6 +278,7 @@ class ScheduleDialog(widget, base):
         sdate = self._db_date_str(dflt_start_date)
         if sdate not in self._daily_schedule:
             return
+
         items = self._daily_schedule[sdate]
         self._populate_schedule_table(items)
 
@@ -306,7 +305,6 @@ class ScheduleDialog(widget, base):
             schedule_items[item.item_identifier()] = item
 
         self._daily_schedule[self._db_date_str(sched_date)] = schedule_items
-        
 
     def _pick_a_random_track(self, folder_id):
         if folder_id not in self._tracks:
@@ -320,15 +318,38 @@ class ScheduleDialog(widget, base):
             return None
         return track
 
+    def _pick_a_random_track_by_genre(self, item:"TemplateItem") -> "SongItem":
+        # Same folder for now
+        if item.genre() == -1:
+            return item
+
+        tracks = self._tracks[item.folder_id()]
+
+        tracks_same_genre = [track for track in tracks.values() if track.genre() == item.genre()]
+        if len(tracks_same_genre) == 0:
+            print(f"No tracks found for genre {item.genre()} in folder {item.folder_id()}")
+            return item
+
+        track = random.choice(tracks_same_genre)
+        if track.duration() == 0:
+            print(f"Track {track.title()} has zero duration, skipping.")
+            return item
+
+        song_item = self._make_song_item_from_track(track, item)
+        return song_item
+        
 
     def _convert_category_to_track(self, schedule_items):
         s_items = []
         for item in schedule_items:
 
             if item.item_type() != ItemType.FOLDER:
-                print(f"Item: {item.title()} - Type: {item.item_type()}")
-            
-                s_items.append(item)
+                # Track - Check rotation based
+                if item.item_type() == ItemType.SONG and item.rotation() == "R":
+                    track = self._pick_a_random_track_by_genre(item)
+                    s_items.append(track)
+                else:
+                    s_items.append(item)
             else:
 
                 track = self._pick_a_random_track(item.folder_id())
@@ -338,23 +359,26 @@ class ScheduleDialog(widget, base):
                 if track is None:
                     continue
 
-                track_item = SongItem(track.title())
-                track_item.set_artist_id(track.artist_id())
-                track_item.set_duration(track.duration())
-                track_item.set_title(track.title())
-
-                track_item.set_folder_name(item.folder_name())
-                track_item.set_folder_id(item.folder_id())
-
-                track_item.set_track_id(track.track_id())
-                track_item.set_artist_id(track.artist_id())
-                track_item.set_artist_name(track.artist_name())
-                track_item.set_item_path(track.file_path())
-                track_item.set_hour(item.hour())
-
+                track_item = self._make_song_item_from_track(track, item)
                 s_items.append(track_item)
 
         return s_items
+
+    def _make_song_item_from_track(self, track: "Track", item: "TemplateItem") -> "SongItem":
+        song_item = SongItem(track.title())
+        song_item.set_artist_id(track.artist_id())
+        song_item.set_duration(track.duration())
+        song_item.set_title(track.title())
+
+        song_item.set_folder_name(item.folder_name())
+        song_item.set_folder_id(item.folder_id())
+
+        song_item.set_track_id(track.track_id())
+        song_item.set_artist_name(track.artist_name())
+        song_item.set_item_path(track.file_path())
+        song_item.set_hour(item.hour())
+
+        return song_item
 
 
     def _append_comm_breaks(self, comm_break_items: list, processed_items: list) ->list:

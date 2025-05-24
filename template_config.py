@@ -54,7 +54,8 @@ from schedule_dialog import ScheduleDialog
 from data_types import (
     read_registry, 
     MSSQL_CONN,
-    TrackColumns
+    TrackColumns,
+    RotationComboBox
 )
 
 from track import Track
@@ -130,10 +131,10 @@ class TemplateConfiguration(widget, base):
         self.btnSchedule.setIcon(icon)
         self.btnSchedule.setIconSize(QSize(30, 30))
 
-        self.btnNew.clicked.connect(self.on_new)
+        self.btnNew.clicked.connect(self.on_new_template)
         self.btnEdit.clicked.connect(self.on_edit)
         self.btnStats.clicked.connect(self.on_stats)
-        self.btnSave.clicked.connect(self.on_save)
+        self.btnSave.clicked.connect(self.on_save_template)
         self.btnSearch.clicked.connect(self.on_search)
         self.btnDeleteTemplate.clicked.connect(self.on_delete_template)
 
@@ -202,7 +203,7 @@ class TemplateConfiguration(widget, base):
     def _setup_items_table(self):
         self.twItems.clear()
         self.twItems.setRowCount(0)
-        self.twItems.setColumnCount(7)
+        self.twItems.setColumnCount(8)
 
         self.twItems.setSizeAdjustPolicy(
             QAbstractScrollArea.AdjustToContents)
@@ -215,8 +216,9 @@ class TemplateConfiguration(widget, base):
         self.twItems.setRowHeight(4, 10)
         self.twItems.setRowHeight(5, 10)
         self.twItems.setRowHeight(6, 10)
+        self.twItems.setRowHeight(7, 10)
 
-        self.twItems.setHorizontalHeaderLabels(["Start", "Length", "Title", "Artist", "Category", "Filename", "Path"])
+        self.twItems.setHorizontalHeaderLabels(["Start", "Length", "Title", "Artist", "Category", "Filename", "Path", "Rotation"])
         self.twItems.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
     
     def _populate_items_table(self, template_items: dict):
@@ -230,7 +232,7 @@ class TemplateConfiguration(widget, base):
             if item.item_type() == ItemType.HEADER:
                 item.set_item_row(row)
 
-            self.add_template_item(row, item)
+            self.add_item_to_table(row, item)
 
     def _add_blank_rows(self, t_items: dict):
         prev_item = None
@@ -322,7 +324,7 @@ class TemplateConfiguration(widget, base):
         self.twTemplates.setHorizontalHeaderLabels(["Name", "Hours", "DOW"])
         self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-    def on_new(self):
+    def on_new_template(self):
         dialog = TemplateDialog()
         result = dialog.exec_()
 
@@ -449,7 +451,7 @@ class TemplateConfiguration(widget, base):
         for key, item in template._template_items.items():
             print(f"{key} - {item.title()} - {item.time()}")
 
-    def on_save(self):
+    def on_save_template(self):
         # Add try catch 
         self.db_config.save(self.templates)
 
@@ -712,6 +714,7 @@ class TemplateConfiguration(widget, base):
             new_item.set_artist_id(self.current_track.artist_id())
             new_item.set_artist_name(self.current_track.artist_name())
             new_item.set_item_path(self.current_track.file_path())
+            new_item.set_genre(self.current_track.genre())
 
         if new_item is None:
             return
@@ -741,15 +744,17 @@ class TemplateConfiguration(widget, base):
         self.twItems.insertRow(new_row) 
 
         # New item is inserted in the previous row 
-        self.add_template_item(new_row, new_item)
+        self.add_item_to_table(new_row, new_item)
+
+        # Add item to the current template
+        self.current_template.add_item(new_item)
 
         self.compute_start_times()
 
         self.template_stats.update_stats(hour, self.current_template)
 
-        
 
-    def add_template_item(self, row: int, item: "TemplateItem"):
+    def add_item_to_table(self, row: int, item: "TemplateItem"):
 
         if item.item_type() not in BaseTableWidgetItem.widget_register:
             return
@@ -774,7 +779,16 @@ class TemplateConfiguration(widget, base):
 
         self.twItems.setItem(row, 6, WidgetItem(item.item_path()))
 
-        self.current_template.add_item(item)
+        if item.item_type() == ItemType.HEADER or \
+              item.item_type() == ItemType.FOLDER or \
+              item.item_type() == ItemType.EMPTY:
+            self.twItems.setItem(row, 7, WidgetItem(""))
+        else:
+            rcb = RotationComboBox(item) 
+            rcb.currentIndexChanged.connect(rcb.on_current_index_changed)
+            self.twItems.setCellWidget(row, 7, rcb)
+
+        #self.current_template.add_item(item)
 
         if item.item_type() == ItemType.HEADER:
             wi_duration.setFont(QFont("Times", 10, QFont.Bold))
@@ -802,7 +816,8 @@ class TemplateConfiguration(widget, base):
         mssql = self._get_mssql_connection()
 
         if mssql.connect():
-            sql = (f"Select TrackReference, TrackTitle, ArtistSearch, Duration, ArtistID_1, FolderID, FilePath "
+            sql = (f"Select TrackReference, TrackTitle, ArtistSearch, "
+                   f" Duration, ArtistID_1, FolderID, FilePath, Genre "
                    f" from Tracks "
                    f" where ArtistID_1 is not Null"
                    f" order by TrackReference ")
@@ -820,6 +835,7 @@ class TemplateConfiguration(widget, base):
                 folder_id = int(row[TrackColumns.FOLDER_ID])
                 track.set_folder_id(folder_id)
                 track.set_file_path(row[TrackColumns.FILEPATH])
+                track.set_genre(row[TrackColumns.GENRE])
 
                 if folder_id not in folders:
                      folders[folder_id] = {}
