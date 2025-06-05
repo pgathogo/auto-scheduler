@@ -4,6 +4,7 @@
 *.txt
 *~
 *__*
+*.sh
 
 # Folders
 data/

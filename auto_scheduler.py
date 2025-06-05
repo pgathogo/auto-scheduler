@@ -52,7 +52,7 @@ class AutoScheduler(widget, base):
 
         sch_icon = QIcon('icons/booking.bmp')
         self.on_schedule_act = QAction(sch_icon, "&View Schedule", self)
-        self.on_schedule_act.triggered.connect(self.on_schedule)
+        self.on_schedule_act.triggered.connect(self.on_view_schedule)
 
     def create_mdi_child(self, title: str):
         child = MdiChild(title)
@@ -65,7 +65,7 @@ class AutoScheduler(widget, base):
         clock_template.showMaximized()
         self.status_bar.showMessage(f"Tracks Database: {clock_template.mssql_conn.database()}")
 
-    def on_schedule(self):
+    def on_view_schedule(self):
         view_schedule = ViewScheduleDialog(self)
         self.mdi_area.addSubWindow(view_schedule)
         view_schedule.showMaximized()

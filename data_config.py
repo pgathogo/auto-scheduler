@@ -176,7 +176,7 @@ class DataConfiguration:
             item_identifier = item.item_identifier()
             folder_name = item.folder_name()
             rotation = item.rotation()
-            genre = item.genre()
+            genre = item.genre() if item.genre() is not None else -1
 
             print(f"Title: {title}: Rotation: {rotation} - Genre: {genre}")
             
@@ -185,7 +185,6 @@ class DataConfiguration:
                    f' ({item_type},"{start_time}",{hour},{duration},"{title}","{artist_name}", {artist_id},{folder_id}, '
                    f' "{item_path}",{track_id}, {item_row},"{item_identifier}", {template_id}, "{folder_name}", '
                    f' "{rotation}", {genre}) RETURNING id;' )
-
 
             new_id = -1
             try:
