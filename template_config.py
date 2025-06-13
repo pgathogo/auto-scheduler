@@ -486,6 +486,8 @@ class TemplateConfiguration(widget, base):
                     f" FROM Tracks "
                    f" WHERE TrackTitle LIKE {title_search} "
                      f" AND ArtistSearch LIKE {artist_search} "
+                     f" AND FolderID > 0 "
+                     f" AND TrackDeleted = 0 "
                    f" ORDER by TrackReference ")
             
             rows = mssql_conn.execute_query(sql)
@@ -820,6 +822,8 @@ class TemplateConfiguration(widget, base):
                    f" Duration, ArtistID_1, FolderID, FilePath, Genre "
                    f" from Tracks "
                    f" where ArtistID_1 is not Null"
+                     f" AND FolderID > 0 "
+                     f" AND TrackDeleted = 0 "
                    f" order by TrackReference ")
 
             rows = mssql.execute_query(sql)
