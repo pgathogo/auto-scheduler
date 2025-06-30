@@ -27,6 +27,8 @@ class ViewScheduleDialog(widget, base):
 
         self.edtDate.setDate(QDate.currentDate())
 
+        self.schedule_items = []
+
         self.edtDate.dateChanged.connect(self.on_date_changed)
         self.show_schedule_by_date(self.edtDate.date())
 
@@ -38,9 +40,9 @@ class ViewScheduleDialog(widget, base):
         self._load_schedule_by_date(date)
 
     def _load_schedule_by_date(self, date):
-        schedule_items = self.db_config.fetch_schedule_by_date(date)
+        self.schedule_items = self.db_config.fetch_schedule_by_date(date)
 
-        for item in schedule_items:
+        for item in self.schedule_items:
             self._add_schedule_item(item)
 
     def _add_schedule_item(self, s_item):
@@ -93,11 +95,23 @@ class ViewScheduleDialog(widget, base):
         self.twViewSchedule.setColumnWidth(7, 250)
 
         self.twViewSchedule.setHorizontalHeaderLabels(["Date", "Start", "Length", "Title", "Artist", "Category", "Filename", "Path" ])
-        
-        
+
+    def on_delete_all_clicked(self):
+        """ Delete all schedule items for the selected date and schedule ref"""
+        # Extract all schedule reference from the schedule items
+        if not self.schedule_items:
+            return
+
+        schedule_refs = {item.schedule_ref() for item in self.schedule_items}
+
+        if not schedule_refs:
+            return
+
+        date = self.edtDate.date().toString("yyyy-MM-dd")
+
+        if not date:
+            return
 
 
-
-
-
+        self.db_config.delete_schedule_by_date(date, schedule_refs)
 

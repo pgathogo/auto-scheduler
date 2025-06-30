@@ -238,6 +238,10 @@ class DataConfiguration:
             con.commit()
             con.close()
 
+    def delete_schedule_by_date(self, sched_date, sched_refs: list) ->bool:
+        
+        pass
+
     def execute_query(self, sql_stmt: str) -> bool:
         con = self._connect()
         curs = con.cursor()
@@ -285,7 +289,6 @@ class DataConfiguration:
             items = self.fetch_template_items(template)
 
 
-            print('Adding blank rows...')
             items_with_blanks = self._insert_blank_rows(items)
             template.assign_items(items_with_blanks)
 

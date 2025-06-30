@@ -258,6 +258,8 @@ class ScheduleDialog(widget, base):
 
             comm_breaks = self.fetch_comm_break(start_date, self._template.hours())
             comm_break_items = self._make_comm_break_items(comm_breaks)
+
+
             template_items = list(self._template.template_items().values())
 
             # Remove empty items
@@ -384,19 +386,27 @@ class ScheduleDialog(widget, base):
     def _append_comm_breaks(self, comm_break_items: list, processed_items: list) ->list:
         appended_list = []
         for hour in self._template.hours():
+
             hour_comm_breaks = [comm_break for comm_break in comm_break_items if comm_break.hour() == hour]
-            items = [item for item in processed_items if item.hour() == hour]
+
+            items = [item for item in processed_items if item.hour() == hour and item.start_time().toString("hh:mm:ss") != ""   ]
             header_item = items.pop(0)
 
             mixed_items = items + hour_comm_breaks
+            
+            mixed_items.sort(key=lambda x: x.start_time())
+
             self._compute_hourly_start_times(mixed_items)
 
-            mixed_items.sort(key=lambda x: x.start_time())
             mixed_items.insert(0, header_item)
             appended_list += mixed_items
 
         return appended_list
 
+
+    def _print_mixed_items(self, items):
+        for item in items:
+            print(f"{item.start_time()} {item.start_time().toString('hh:mm:ss')} - {item.title()}")
 
     def _insert_commercial_breaks(self, schedule_items: list, comm_breaks: list):
         insert_locations = OrderedDict()
@@ -487,20 +497,18 @@ class ScheduleDialog(widget, base):
             prev_dur = item.duration()
 
     def _compute_hourly_start_times(self, schedule_items: list):
-        prev_dur = 0
-        prev_start_time = QTime(0, 0, 0) 
+        prev_start_time = None
         hr = -1
-        for item in schedule_items:
+        for idx, item in enumerate(schedule_items):
             if hr != item.hour():
                 hr = item.hour()
                 prev_start_time = QTime(hr, 0, 0)
-                prev_dur = item.duration()
-
-            start_time = prev_start_time.addMSecs(prev_dur)
-            item.set_start_time(start_time)
-
-            prev_start_time = start_time
-            prev_dur = item.duration()
+                item.set_start_time(prev_start_time)
+            else:
+                # Add previous item's duration to previous item's start time
+                prev_item = schedule_items[idx - 1]
+                prev_start_time = prev_item.start_time().addMSecs(prev_item.duration())
+                item.set_start_time(prev_start_time)
 
 
     def fetch_comm_break(self, s_date, hrs: list):
