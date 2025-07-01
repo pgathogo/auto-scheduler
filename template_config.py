@@ -736,6 +736,12 @@ class TemplateConfiguration(widget, base):
         hour = prev_item.hour()
 
         new_item.set_hour(hour)
+
+        # Check if we add this item we shall overlow to the next hour
+        hr_items = self.current_template.template_items_by_hour(hour)
+        if self._hour_overflows(new_item, hr_items):
+            self.show_message("Adding this item will cause the hour to overflow!", "Item Rejected !")
+            return
     
         new_row = item.row()
         prev_row = item.row()-1
@@ -796,6 +802,20 @@ class TemplateConfiguration(widget, base):
             wi_duration.setFont(QFont("Times", 10, QFont.Bold))
             self._hour_headers[item.hour()] = wi_duration
 
+
+    def _hour_overflows(self, new_item: "TemplateItem", hr_items: list) -> bool:
+        # Check if adding the new item would overflow the current hour
+        current_hour = new_item.start_time().hour()
+        current_duration = new_item.duration()
+
+        # Calculate the total duration of existing items in the current hour
+        # total_duration = sum(item.duration() for item in hr_items if item.start_time().hour() == current_hour)
+        total_duration = sum(item.duration() for item in hr_items)
+        # total_duration  = 0
+        # for index, item in enumerate(hr_items):
+        #     total_duration += item.duration()
+
+        return total_duration + current_duration > 3600000  # 1 hour in milliseconds
 
     def on_create_schedule(self):
         if self.current_template is None:
@@ -861,10 +881,10 @@ class TemplateConfiguration(widget, base):
             total_duration += track.duration()
         return total_duration // len(self.tracks[folder_id])
 
-    def show_message(self, message:str):
+    def show_message(self, message:str, title:str="Message"):
         msg = QMessageBox(self)
         msg.setText(message)
-        msg.setWindowTitle("Message")
+        msg.setWindowTitle(title)
         msg.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg.exec_()
 

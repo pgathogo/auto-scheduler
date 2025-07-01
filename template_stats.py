@@ -5,6 +5,11 @@ from PyQt5.QtCore import (
     QTime
 )
 
+from PyQt5.QtGui import (
+    QBrush,
+    QColor
+)
+
 from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem
@@ -31,6 +36,12 @@ class TemplateStatistics:
             time_duration = time.addMSecs(total_duration).toString("hh:mm:ss")
             time_item = QTableWidgetItem(time_duration)
 
+            if (total_duration > 3600000):
+                hour_item.setForeground(QBrush(QColor("red")))
+                count_item.setForeground(QBrush(QColor("red")))
+                time_item.setForeground(QBrush(QColor("red")))
+
+
             self._stats_widget.setItem(i, 0, hour_item)
             self._stats_widget.setItem(i, 1, count_item)
             self._stats_widget.setItem(i, 2, time_item)
@@ -48,7 +59,7 @@ class TemplateStatistics:
         self._stats_widget.clear()
         self._stats_widget.setRowCount(0)
         self._stats_widget.setColumnCount(3)
-        self._stats_widget.setHorizontalHeaderLabels(["Hour", "Item Count", "Time"])
+        self._stats_widget.setHorizontalHeaderLabels(["Hour", "Total Items", "Total Time"])
         self._stats_widget.setColumnWidth(0, 80)
         self._stats_widget.setColumnWidth(1, 100)
         self._stats_widget.setColumnWidth(2, 100)
