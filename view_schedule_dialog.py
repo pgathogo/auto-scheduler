@@ -23,7 +23,7 @@ class ViewScheduleDialog(widget, base):
         super(ViewScheduleDialog, self).__init__()
         self.setupUi(self)
 
-        self.db_config = DataConfiguration("data/templates.db")
+        self.db_config = DataConfiguration("")
 
         self.edtDate.setDate(QDate.currentDate())
 

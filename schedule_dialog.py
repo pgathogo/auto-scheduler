@@ -67,7 +67,7 @@ class ScheduleDialog(widget, base):
         self._schedule_items = OrderedDict()
         self._daily_schedule = {}
 
-        self.db_config = DataConfiguration("data/templates.db")
+        self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
 
         icon = QIcon('icons/generate.png')
@@ -361,8 +361,9 @@ class ScheduleDialog(widget, base):
                 if track is None:
                     continue
 
-                track_item = self._make_song_item_from_track(track, item)
-                s_items.append(track_item)
+                song_item = self._make_song_item_from_track(track, item)
+
+                s_items.append(song_item)
 
         return s_items
 
@@ -379,6 +380,7 @@ class ScheduleDialog(widget, base):
         song_item.set_artist_name(track.artist_name())
         song_item.set_item_path(track.file_path())
         song_item.set_hour(item.hour())
+        song_item.set_start_time(item.start_time())
 
         return song_item
 

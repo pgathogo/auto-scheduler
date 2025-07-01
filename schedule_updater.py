@@ -30,7 +30,7 @@ class ScheduleUpdater(QObject):
     def __init__(self, daily_schedule: dict, parent=None):
         QObject.__init__(self, parent)
         self.schedule = daily_schedule
-        self.db_config = DataConfiguration("data/templates.db")
+        self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
 
     def exec_(self):

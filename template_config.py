@@ -95,7 +95,7 @@ class TemplateConfiguration(widget, base):
 
         self.folder_names = {}
 
-        self.db_config = DataConfiguration("data/templates.db")
+        self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
 
         self.set_template_table()
@@ -322,7 +322,7 @@ class TemplateConfiguration(widget, base):
         self.twTemplates.setRowCount(0)
         self.twTemplates.setColumnCount(3)
         self.twTemplates.setHorizontalHeaderLabels(["Name", "Hours", "DOW"])
-        self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def on_new_template(self):
         dialog = TemplateDialog()

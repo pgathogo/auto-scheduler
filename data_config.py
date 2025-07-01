@@ -33,7 +33,7 @@ from track import Track
 
 class DataConfiguration:
     def __init__(self, db_name: str):
-        self._database = db_name
+        self._database = "data/templates.db"
 
     def _connect(self):
         return sqlite3.connect(self._database)
