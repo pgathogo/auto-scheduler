@@ -512,8 +512,9 @@ class ScheduleDialog(widget, base):
             else:
                 # Add previous item's duration to previous item's start time
                 prev_item = schedule_items[idx - 1]
-                prev_start_time = prev_item.start_time().addMSecs(prev_item.duration())
-                item.set_start_time(prev_start_time)
+                if prev_item.start_time() != None:
+                    prev_start_time = prev_item.start_time().addMSecs(prev_item.duration())
+                    item.set_start_time(prev_start_time)
 
             # Check and clip items that exceed their hour
             if item.start_time().hour() > item.hour():
