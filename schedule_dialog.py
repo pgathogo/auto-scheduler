@@ -257,8 +257,8 @@ class ScheduleDialog(widget, base):
                 continue
 
             comm_breaks = self.fetch_comm_break(start_date, self._template.hours())
-            comm_break_items = self._make_comm_break_items(comm_breaks)
 
+            comm_break_items = self._make_comm_break_items(comm_breaks)
 
             template_items = list(self._template.template_items().values())
 
@@ -399,9 +399,12 @@ class ScheduleDialog(widget, base):
             mixed_items.sort(key=lambda x: x.start_time())
 
             self._compute_hourly_start_times(mixed_items)
+            clean_items = [item for item in mixed_items if item.start_time() != None ]
 
-            mixed_items.insert(0, header_item)
-            appended_list += mixed_items
+            #mixed_items.insert(0, header_item)
+            #appended_list += mixed_items
+            clean_items.insert(0, header_item)
+            appended_list += clean_items
 
         return appended_list
 
@@ -511,6 +514,10 @@ class ScheduleDialog(widget, base):
                 prev_item = schedule_items[idx - 1]
                 prev_start_time = prev_item.start_time().addMSecs(prev_item.duration())
                 item.set_start_time(prev_start_time)
+
+            # Check and clip items that exceed their hour
+            if item.start_time().hour() > item.hour():
+                item.set_start_time(None)
 
 
     def fetch_comm_break(self, s_date, hrs: list):
