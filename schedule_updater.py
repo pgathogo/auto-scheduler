@@ -205,15 +205,17 @@ class ScheduleUpdater(QObject):
         return MSSQLData(server, database, username, password)
 
     def _make_sqlite_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
-        ins_stmt = (f" Insert into schedule ( schedule_ref, schedule_date, template_id, start_time, "
-                    f" schedule_hour, item_identifier, item_type, duration, title, artist_id, artist_name, "
-                    f" folder_id, folder_name, track_id, filepath, item_row )"
-                    f" VALUES ({schedule_ref}, '{sched_date}', {item.template_id()}, "
-                    f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
-                    f" '{item.item_identifier()}', {int(item.item_type())}, {item.duration()}, "
-                    f" '{item.title()}', {item.artist_id()}, '{item.artist_name()}', "
-                    f" {item.folder_id()}, '{item.folder_name()}', {item.track_id()}, "
-                    f" '{item.item_path()}', {seq}); ")
+        st = item.start_time().toString('HH:mm:ss')
+
+        ins_stmt = (f' Insert into schedule ( schedule_ref, schedule_date, template_id, start_time, '
+                    f' schedule_hour, item_identifier, item_type, duration, title, artist_id, artist_name, '
+                    f' folder_id, folder_name, track_id, filepath, item_row )'
+                    f' VALUES ({schedule_ref}, "{sched_date}", {item.template_id()}, '
+                    f' "{st}", {item.hour()}, '
+                    f' "{item.item_identifier()}", {int(item.item_type())}, {item.duration()}, '
+                    f' "{item.title()}", {item.artist_id()}, "{item.artist_name()}", '
+                    f'  {item.folder_id()}, "{item.folder_name()}", {item.track_id()}, '
+                    f' "{item.item_path()}", {seq}); ')
 
         return ins_stmt
 
