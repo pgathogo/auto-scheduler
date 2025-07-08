@@ -391,7 +391,13 @@ class ScheduleDialog(widget, base):
 
             hour_comm_breaks = [comm_break for comm_break in comm_break_items if comm_break.hour() == hour]
 
-            items = [item for item in processed_items if item.hour() == hour and item.start_time().toString("hh:mm:ss") != ""   ]
+            items = []
+            for item in processed_items:
+                if item.start_time() is None:
+                    continue
+                if item.hour() == hour and item.start_time().toString("hh:mm:ss") != "":
+                    items.append(item)
+
             header_item = items.pop(0)
 
             mixed_items = items + hour_comm_breaks
