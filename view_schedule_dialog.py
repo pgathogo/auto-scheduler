@@ -100,14 +100,14 @@ class ViewScheduleDialog(widget, base):
 
         self._initilize_schedule_table()
 
-        dates = set()
+        dates = []
         for item in self.schedule_items:
             added_item = self._add_schedule_item(item)
 
             if added_item:
-                dates.add(added_item.formatted_date())
+                if added_item.formatted_date() not in dates:
+                    dates.add(added_item.formatted_date())
 
-        sorted_dates = sorted(dates)
         self._show_dates(dates)
 
     def _add_schedule_item(self, s_item):
