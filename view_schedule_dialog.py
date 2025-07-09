@@ -66,6 +66,12 @@ class ViewScheduleDialog(widget, base):
             item.setData(Qt.ItemDataRole.UserRole, template.id())
             self.lwTemplates.addItem(item)
 
+    def _show_dates(self, dates: set):
+        self.lwDates.clear()
+        for date in dates:
+            item = QListWidgetItem(date)
+            self.lwDates.addItem(item)
+
     def on_range_changed(self, index: int):
         if index == 0:  # "To" is selected
             self.edtTo.setEnabled(True)
@@ -94,8 +100,14 @@ class ViewScheduleDialog(widget, base):
 
         self._initilize_schedule_table()
 
+        dates = set()
         for item in self.schedule_items:
-            self._add_schedule_item(item)
+            added_item = self._add_schedule_item(item)
+
+            if added_item:
+                dates.add(added_item.formatted_date())
+
+        self._show_dates(dates)
 
     def _add_schedule_item(self, s_item):
         row = self.twViewSchedule.rowCount()
@@ -127,6 +139,8 @@ class ViewScheduleDialog(widget, base):
             self.twViewSchedule.setItem(row, 6, WidgetItem(((s_item.formatted_track_id()))))
 
         self.twViewSchedule.setItem(row, 7, WidgetItem(s_item.item_path()))
+
+        return s_item
 
 
     def _initilize_schedule_table(self):

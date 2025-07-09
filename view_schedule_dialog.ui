@@ -79,10 +79,18 @@
      <item>
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="QListWidget" name="lwTemplates"/>
+        <widget class="QListWidget" name="lwTemplates">
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+        </widget>
        </item>
        <item>
-        <widget class="QListWidget" name="lwDates"/>
+        <widget class="QListWidget" name="lwDates">
+         <property name="editTriggers">
+          <set>QAbstractItemView::NoEditTriggers</set>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>
