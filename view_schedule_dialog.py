@@ -106,7 +106,7 @@ class ViewScheduleDialog(widget, base):
 
             if added_item:
                 if added_item.formatted_date() not in dates:
-                    dates.add(added_item.formatted_date())
+                    dates.append(added_item.formatted_date())
 
         self._show_dates(dates)
 
