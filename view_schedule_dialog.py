@@ -107,6 +107,7 @@ class ViewScheduleDialog(widget, base):
             if added_item:
                 dates.add(added_item.formatted_date())
 
+        sorted_dates = sorted(dates)
         self._show_dates(dates)
 
     def _add_schedule_item(self, s_item):
