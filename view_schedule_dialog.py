@@ -1,7 +1,8 @@
 from PyQt5 import uic
 
 from PyQt5.QtWidgets import (
-    QTableWidget
+    QTableWidget,
+    QListWidgetItem
 )
 
 from PyQt5.QtCore import (
@@ -25,12 +26,24 @@ class ViewScheduleDialog(widget, base):
 
         self.db_config = DataConfiguration("")
 
-        self.edtDate.setDate(QDate.currentDate())
+        self.edtFrom.setDate(QDate.currentDate())
+        self.edtTo.setDate(QDate.currentDate())
 
         self.schedule_items = []
+        self.templates = {}
 
-        self.edtDate.dateChanged.connect(self.on_date_changed)
-        self.show_schedule_by_date(self.edtDate.date())
+        # self.edtFrom.dateChanged.connect(self.on_date_changed)
+        # self.edtTo.dateChanged.connect(self.on_date_changed)
+
+        self._populate_range_combo()
+        self.cbRange.currentIndexChanged.connect(self.on_range_changed)
+        self.cbRange.setCurrentIndex(0)
+
+        self.lwTemplates.currentItemChanged.connect(self.on_template_changed)
+
+        self._populate_template_list()
+
+        # self.show_schedule_by_date(self.edtFrom.date())
 
     def on_date_changed(self, date: QDate):
         self.show_schedule_by_date(date)
@@ -39,8 +52,47 @@ class ViewScheduleDialog(widget, base):
         self._initilize_schedule_table()
         self._load_schedule_by_date(date)
 
+    def _populate_range_combo(self):
+        self.cbRange.addItem("To")
+        self.cbRange.addItem("Future")
+
+    def _populate_template_list(self):
+        self.templates = self.db_config.fetch_all_templates()
+        self._show_templates(self.templates)
+
+    def _show_templates(self, templates: dict):
+        for name, template in templates.items():
+            item = QListWidgetItem(name)
+            item.setData(Qt.ItemDataRole.UserRole, template.id())
+            self.lwTemplates.addItem(item)
+
+    def on_range_changed(self, index: int):
+        if index == 0:  # "To" is selected
+            self.edtTo.setEnabled(True)
+        else:  # "Future" is selected
+            self.edtTo.setEnabled(False)
+
+    def on_template_changed(self, current: QListWidgetItem, previous: QListWidgetItem):
+        if current:
+            template_id = current.data(Qt.ItemDataRole.UserRole)
+
+            if self.cbRange.currentIndex() == 0:
+                self._load_schedule_by_template_and_date_range(template_id,
+                                                            self.edtFrom.date(), self.edtTo.date())
+            else:
+                self._load_schedule_by_template_and_date_range(template_id,
+                                                            self.edtFrom.date(), None)
+
     def _load_schedule_by_date(self, date):
         self.schedule_items = self.db_config.fetch_schedule_by_date(date)
+
+        for item in self.schedule_items:
+            self._add_schedule_item(item)
+
+    def _load_schedule_by_template_and_date_range(self, template_id: int, start_date: QDate, end_date: QDate):
+        self.schedule_items = self.db_config.fetch_schedule_by_template_and_date_range(template_id, start_date, end_date)
+
+        self._initilize_schedule_table()
 
         for item in self.schedule_items:
             self._add_schedule_item(item)
@@ -107,7 +159,7 @@ class ViewScheduleDialog(widget, base):
         if not schedule_refs:
             return
 
-        date = self.edtDate.date().toString("yyyy-MM-dd")
+        date = self.edtFrom.date().toString("yyyy-MM-dd")
 
         if not date:
             return

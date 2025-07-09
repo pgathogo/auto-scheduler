@@ -13,24 +13,44 @@
   <property name="windowTitle">
    <string>Dialog</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout">
+  <layout class="QVBoxLayout" name="verticalLayout_2">
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QLabel" name="label">
        <property name="text">
-        <string>Date:</string>
+        <string>From Date:</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QDateEdit" name="edtDate">
+      <widget class="QDateEdit" name="edtFrom">
        <property name="minimumSize">
         <size>
          <width>150</width>
          <height>0</height>
         </size>
        </property>
+       <property name="buttonSymbols">
+        <enum>QAbstractSpinBox::UpDownArrows</enum>
+       </property>
+       <property name="calendarPopup">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cbRange"/>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>To Date:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDateEdit" name="edtTo">
        <property name="buttonSymbols">
         <enum>QAbstractSpinBox::UpDownArrows</enum>
        </property>
@@ -55,14 +75,28 @@
     </layout>
    </item>
    <item>
-    <widget class="QTableWidget" name="twViewSchedule">
-     <property name="selectionMode">
-      <enum>QAbstractItemView::SingleSelection</enum>
-     </property>
-     <property name="selectionBehavior">
-      <enum>QAbstractItemView::SelectRows</enum>
-     </property>
-    </widget>
+    <layout class="QHBoxLayout" name="horizontalLayout_2" stretch="0,70">
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout">
+       <item>
+        <widget class="QListWidget" name="lwTemplates"/>
+       </item>
+       <item>
+        <widget class="QListWidget" name="lwDates"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QTableWidget" name="twViewSchedule">
+       <property name="selectionMode">
+        <enum>QAbstractItemView::SingleSelection</enum>
+       </property>
+       <property name="selectionBehavior">
+        <enum>QAbstractItemView::SelectRows</enum>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
   </layout>
  </widget>

@@ -492,6 +492,41 @@ class DataConfiguration:
 
         return schedule_items
 
+
+    def fetch_schedule_by_template_and_date_range(self, template_id: int, start_date: QDate, end_date: QDate) -> list:
+        schedule_items = []
+        con = self._connect()
+        curs = con.cursor() 
+
+        if end_date is None:
+            date_filter = f" AND schedule_date >= '{start_date.toString('yyyy-MM-dd')}' "
+        else:
+            date_filter = (f" AND schedule_date BETWEEN '{start_date.toString('yyyy-MM-dd')}' "
+                           f" AND '{end_date.toString('yyyy-MM-dd')}' ")
+
+        sel_stmt = (f"SELECT id, schedule_ref, schedule_date, template_id, start_time, "
+                    f" schedule_hour, item_identifier, item_type, duration, title, "
+                    f" artist_id, artist_name, folder_id, folder_name, track_id, filepath, item_row "
+                    f" FROM schedule "
+                    f" WHERE template_id = {template_id} "
+                    f" {date_filter}"
+                    )
+        curs.execute(sel_stmt)
+
+        rows = curs.fetchall()
+
+        for row in rows:
+            schedule_item = self._make_schedule_item(row)
+
+            if schedule_item is None:
+                continue
+
+            schedule_items.append(schedule_item)
+
+        con.close()
+
+        return schedule_items
+
     def _make_schedule_item(self, db_record):
         id = int(db_record[int(ScheduleColumns.ID)])
         schedule_ref = db_record[int(ScheduleColumns.SCHEDULE_REF)]
