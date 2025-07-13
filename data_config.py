@@ -45,13 +45,16 @@ class DataConfiguration:
 
             if template.db_action() == DBAction.CREATE:
                 template_id = self._create_template(template)
+                template.set_db_action(DBAction.NONE)
 
             if template.db_action() == DBAction.UPDATE:
                 template_id = self._update_template(template)
+                template.set_db_action(DBAction.NONE)
 
             if template.db_action() == DBAction.DELETE:
                 self._delete_template_items(template)
                 self._delete_template(template)
+                template.set_db_action(DBAction.NONE)
                 continue
 
             if template.db_action() == DBAction.NONE:
@@ -147,12 +150,15 @@ class DataConfiguration:
 
             if item.db_action() == DBAction.CREATE:
                 new_id = self._create_template_item(item, template_id)
+                item.set_db_action(DBAction.NONE)
 
             if item.db_action() == DBAction.UPDATE:
                 self._update_template_item(item)
+                item.set_db_action(DBAction.NONE)
 
             if item.db_action() == DBAction.DELETE:
                 self._delete_template_item(item)
+                item.set_db_action(DBAction.NONE)
 
         print(f"Creating template items...Done")
 
@@ -407,6 +413,7 @@ class DataConfiguration:
         template.set_id(id)
         template.set_name(name)
         template.set_description(desc)
+        template.set_db_action(DBAction.NONE)
 
             
         hours = [int(h) for h in hours_str.split(',')]
