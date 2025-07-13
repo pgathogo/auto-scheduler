@@ -45,7 +45,9 @@ class DataConfiguration:
 
             if template.db_action() == DBAction.CREATE:
                 template_id = self._create_template(template)
+                template.set_id(template_id)
                 template.set_db_action(DBAction.NONE)
+                print(f'Created template {template.name()} with id {template_id}')
 
             if template.db_action() == DBAction.UPDATE:
                 template_id = self._update_template(template)
@@ -112,11 +114,12 @@ class DataConfiguration:
             return template.id()
 
     def _delete_template_items(self, template):
+        print(f'Deleting items for template {template.name()} - {template.id()}...')
+
         con = self._connect()
         curs = con.cursor()
 
         del_stmt = f'Delete from templateitem Where template_id={template.id()};'
-        print(f'Deleting template items for {template.name()}...')
 
         try:
             curs.execute(del_stmt)
@@ -127,11 +130,12 @@ class DataConfiguration:
             con.close()
 
     def _delete_template(self, template):
+        print(f'Deleting template {template.name()} - {template.id()}...')
+
         con = self._connect()
         curs = con.cursor()
 
         del_stmt = f'Delete from templateheader Where id={template.id()};'
-        print(f'Deleting template {template.name()}...')
 
         try:
             curs.execute(del_stmt)
@@ -151,6 +155,8 @@ class DataConfiguration:
             if item.db_action() == DBAction.CREATE:
                 new_id = self._create_template_item(item, template_id)
                 item.set_db_action(DBAction.NONE)
+                item.set_id(new_id)
+                item.set_template_id(template_id)
 
             if item.db_action() == DBAction.UPDATE:
                 self._update_template_item(item)

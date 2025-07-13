@@ -36,7 +36,7 @@ class TemplateStatistics:
             time_duration = time.addMSecs(total_duration).toString("hh:mm:ss")
             time_item = QTableWidgetItem(time_duration)
 
-            if (total_duration > 3600000):
+            if (total_duration > 3600000): # 1 hour in milliseconds
                 hour_item.setForeground(QBrush(QColor("red")))
                 count_item.setForeground(QBrush(QColor("red")))
                 time_item.setForeground(QBrush(QColor("red")))

@@ -346,6 +346,8 @@ class TemplateConfiguration(widget, base):
                 
 
     def on_edit(self):
+        if len(self.twTemplates.selectionModel().selectedRows()) == 0:
+            return
         dialog = TemplateDialog(self.current_template)
         result = dialog.exec_()
 
@@ -511,20 +513,21 @@ class TemplateConfiguration(widget, base):
             self.display_tracks(tracks)
 
 
-        
-
 
     def on_delete_template(self):
-        if self.current_template is None:
+        if len(self.twTemplates.selectionModel().selectedRows()) == 0:
             return
 
-        print(f"Deleting template {self.current_template.name()}")
+        if self.current_template is None:
+            return
 
         items = self.current_template.template_items()
         item_count = [item for item in items.values() if item.item_type() == ItemType.SONG or item.item_type() == ItemType.FOLDER]
         if len(item_count) > 0:
             if not self.delete_template_confirmation():
                 return
+
+        print(f"Marking template {self.current_template.name()} - {self.current_template.id()} for deletion")
 
         selected = self.twTemplates.selectedItems()
         if len(selected) > 0:
@@ -536,6 +539,7 @@ class TemplateConfiguration(widget, base):
             self.twTemplates.removeRow(selected[0].row())
             twi = self.twTemplates.item(self.twTemplates.rowCount()-1, 0)
             self.twTemplates.setCurrentItem(twi, QItemSelectionModel.SelectCurrent)
+            self._setup_items_table()
             # self.show_templates(self.templates)
 
     def on_delete_template_item(self):
@@ -815,9 +819,11 @@ class TemplateConfiguration(widget, base):
         # for index, item in enumerate(hr_items):
         #     total_duration += item.duration()
 
-        return total_duration + current_duration > 3600000  # 1 hour in milliseconds
+        return total_duration + current_duration > 3720000  # 1 hour and 2 minutes in milliseconds
 
     def on_create_schedule(self):
+        if len(self.twTemplates.selectionModel().selectedRows()) == 0:
+            return
         if self.current_template is None:
             return
         schedule_dlg = ScheduleDialog(self.current_template, self.tracks)
