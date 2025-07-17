@@ -451,6 +451,9 @@ class ScheduleDialog(widget, base):
 
         item = s_item
 
+        if item.start_time() is None:
+            return
+
         if s_item.item_type() not in BaseTableWidgetItem.widget_register:
             return
 
