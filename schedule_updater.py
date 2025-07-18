@@ -79,6 +79,9 @@ class ScheduleUpdater(QObject):
 
                mssql_seq += 1
                mssql_schedule_record = self._make_mssql_schedule_record(sched_date, schedule_ref, item, mssql_seq)
+               if mssql_schedule_record == "":
+                   continue
+
                mssql_stmts.append(mssql_schedule_record)
 
                sqlite_seq += 1
@@ -224,12 +227,16 @@ class ScheduleUpdater(QObject):
         item_source = 'SONG'
         comm_audio = 'AUDIO'
 
+        start_time = item.start_time()
+        if start_time is None:
+            return ""
+
         ins_stmt = (f" Insert into schedule (ScheduleService, ScheduleLineRef, ScheduleDate, "
                     f" ScheduleTime, ScheduleHour, ScheduleHourTime, ScheduleTrackReference, "
                     f" ScheduledFadeIn, ScheduledFadeOut, ScheduledFadeDelay, PlayStatus, "
                     f" AutoTransition, LiveTransition, ItemSource, ScheduleCommMediaType )"
                     f" VALUES ({1}, {schedule_ref}, CONVERT(DATETIME, '{sched_date}', 102), "
-                    f" '{item.start_time().toString('HH:mm:ss')}', {item.hour()}, "
+                    f" '{start_time.toString('HH:mm:ss')}', {item.hour()}, "
                     f" {seq}, {item.track_id()}, {0}, {0}, {0}, '{status}', {1}, {1}, '{item_source}', '{comm_audio}');"
                     )
 
