@@ -240,9 +240,9 @@ class ScheduleDialog(widget, base):
 
     def on_generate_schedule(self):
 
-        self.clear_generated_schedule()
-
         print("Generating schedule...")
+
+        self.clear_generated_schedule()
 
         start_date = self.edtStartDate.date()
         dflt_start_date = start_date
@@ -269,7 +269,7 @@ class ScheduleDialog(widget, base):
             # Maintain the order of items in the template based on how they were inserted
             schedule_items.sort(key=lambda item: item.item_row())
 
-            processed_items = self._convert_category_to_track(schedule_items)
+            processed_items = self._convert_category_to_track(schedule_items,self._template.id())
 
             appended_list = self._append_comm_breaks(comm_break_items, processed_items)
 
@@ -341,7 +341,7 @@ class ScheduleDialog(widget, base):
         return song_item
         
 
-    def _convert_category_to_track(self, schedule_items):
+    def _convert_category_to_track(self, schedule_items, template_id: int) -> list:
         s_items = []
         for item in schedule_items:
 
@@ -349,6 +349,7 @@ class ScheduleDialog(widget, base):
                 # Track - Check rotation based
                 if item.item_type() == ItemType.SONG and item.rotation() == "R":
                     track = self._pick_a_random_track_by_genre(item)
+                    track.set_template_id(template_id)
                     s_items.append(track)
                 else:
                     s_items.append(item)
@@ -362,6 +363,7 @@ class ScheduleDialog(widget, base):
                     continue
 
                 song_item = self._make_song_item_from_track(track, item)
+                song_item.set_template_id(template_id)
 
                 s_items.append(song_item)
 
