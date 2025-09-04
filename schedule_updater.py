@@ -13,7 +13,6 @@ from mssql_data import MSSQLData
 from data_types import MSSQL_CONN
 
 
-
 class ScheduleUpdater(QObject):
     """
     Updates the database with the generated schedule
@@ -45,7 +44,8 @@ class ScheduleUpdater(QObject):
 
         unique_hours_per_date = self.extract_unique_hours_per_date(self.schedule)
         
-        self.remove_existing_hours(unique_hours_per_date)
+        if not self.remove_existing_hours(unique_hours_per_date):
+            return
 
         for sched_date, schedule_items in self.schedule.items():
            mssql_seq = 0
@@ -133,26 +133,27 @@ class ScheduleUpdater(QObject):
 
 
     def remove_existing_hours(self, hours_per_date: dict) -> bool:
+        dates = []
+        unique_hours = set()
         for date, hours in hours_per_date.items():
             hrs = list(hours.keys())
 
-            hr_refs = self._get_schedule_ref(date, hrs)
-            if len(hr_refs[date]) == 0:
-                continue
-            
-            del_stmt_mssql = self._make_delete_statement_mssql(date, hr_refs[date])
+            dates.append(date)
+            unique_hours.update(hrs)
 
-            del_stmt_sqlite = self._make_delete_statement_sqlite(date, hr_refs[date])
+        del_stmt_mssql = self._make_delete_statement_mssql(dates, unique_hours)
 
-            # Execute statements
-            if self.mssql_conn.execute_non_query(del_stmt_mssql):
-                msg = f"Deleted {len(hrs)} hours from date {date} in Sedric database"
+        del_stmt_sqlite = self._make_delete_statement_sqlite(dates, unique_hours)
+
+        # Execute statements
+        if self.mssql_conn.execute_non_query(del_stmt_mssql):
+            msg = f"Deleted {len(unique_hours)} hours from dates {dates} in Sedric database"
+            self.update_progress.emit(0, msg)
+
+            if not self.db_config.execute_query(del_stmt_sqlite):
+                msg = f"Error deleting {len(unique_hours)} hours from dates {dates} in local database"
                 self.update_progress.emit(0, msg)
-
-                if not self.db_config.execute_query(del_stmt_sqlite):
-                    msg = f"Error deleting {len(hrs)} hours from date {date} in local database"
-                    self.update_progress.emit(0, msg)
-                    return False
+                return False
 
         return True
 
@@ -182,21 +183,23 @@ class ScheduleUpdater(QObject):
         return {date: schedule_ref}
 
 
-    def _make_delete_statement_mssql(self, date: str, hr_ref: list) ->str:
-        refs = list(hr_ref.values())
-        sched_refs = ",".join(str(r) for r in refs)
+    def _make_delete_statement_mssql(self, dates: list, hours: set) ->str:
+        date_str = ",".join(f"'{d}'" for d in dates)
+        hours_str = ",".join(str(h) for h in hours)
 
         del_stmt = (f"DELETE from Schedule "
-                    f"WHERE ScheduleDate = '{date}'"
-                    f" AND ScheduleLineRef in ({sched_refs});")
+                    f"WHERE ItemSource = 'SONG'"
+                    f" AND PlayStatus = 'CUED'"
+                    f" AND ScheduleDate in ({date_str})"
+                    f" AND ScheduleHour in ({hours_str});")
         return del_stmt
 
-    def _make_delete_statement_sqlite(self, date: str, hr_refs: list) ->str:
-        hrs = list(hr_refs.keys())
-        hr_str = ",".join(str(h) for h in hrs)
+    def _make_delete_statement_sqlite(self, dates: list, hours: list) ->str:
+        date_str = ",".join(f"'{d}'" for d in dates)
+        hr_str = ",".join(str(h) for h in hours)
 
         del_stmt = (f"DELETE from Schedule "
-                    f"WHERE schedule_date = '{date}'"
+                    f"WHERE schedule_date in ({date_str})"
                     f" AND Schedule_hour in ({hr_str});")
         return del_stmt
 

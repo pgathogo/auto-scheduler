@@ -604,7 +604,6 @@ class ScheduleDialog(widget, base):
         return int(schedule_ref)
         
     def on_save_schedule(self):
-
        if self.schedule_is_saved:
            self.show_message("Schedule already saved!")
            return
@@ -633,7 +632,7 @@ class ScheduleDialog(widget, base):
     def confirm_save(self) ->bool:
         msgbox = QMessageBox(self)
         msgbox.setWindowTitle("Generate Schedule")
-        msgbox.setText(f"Generate schedule will be save permanently.")
+        msgbox.setText(f"Generate schedule will be saved permanently.\n Any existing schedules will be overwritten.")
         msgbox.setInformativeText("Do you want to continue?")
         msgbox.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         msgbox.setDefaultButton(QMessageBox.No)
@@ -686,3 +685,8 @@ class ScheduleDialog(widget, base):
         msg.setWindowTitle("Message")
         msg.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg.exec_()
+
+    def closeEvent(self, event):
+        self.updater_thread.quit()
+        self.updater_thread.wait()
+        event.accept()
