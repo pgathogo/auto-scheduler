@@ -523,6 +523,7 @@ class DataConfiguration:
                     f" FROM schedule "
                     f" WHERE template_id = {template_id} "
                     f" {date_filter}"
+                    f" AND duration > 0"
                     f" ORDER BY schedule_date"
                     )
         curs.execute(sel_stmt)

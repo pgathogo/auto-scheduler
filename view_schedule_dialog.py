@@ -11,6 +11,7 @@ from PyQt5.QtCore import (
 )
 
 from data_config import DataConfiguration
+from schedule_summary import ScheduleSummaryDialog
 
 from template_item import (
     BaseTableWidgetItem,
@@ -26,8 +27,11 @@ class ViewScheduleDialog(widget, base):
 
         self.db_config = DataConfiguration("")
 
-        self.edtFrom.setDate(QDate.currentDate())
-        self.edtTo.setDate(QDate.currentDate())
+        # self.edtFrom.setDate(QDate.currentDate())
+        # self.edtTo.setDate(QDate.currentDate())
+
+        self.edtFrom.setDate(QDate.fromString("01/09/2025", "dd/MM/yyyy"))
+        self.edtTo.setDate(QDate.fromString("30/09/2025", "dd/MM/yyyy"))
 
         self.schedule_items = []
         self.templates = {}
@@ -35,24 +39,69 @@ class ViewScheduleDialog(widget, base):
         # self.edtFrom.dateChanged.connect(self.on_date_changed)
         # self.edtTo.dateChanged.connect(self.on_date_changed)
 
-        self._populate_range_combo()
+        self._populate_dates_range_combo()
         self.cbRange.currentIndexChanged.connect(self.on_range_changed)
         self.cbRange.setCurrentIndex(0)
 
         self.lwTemplates.currentItemChanged.connect(self.on_template_changed)
+        self.lwDates.itemChanged.connect(self.on_date_list_selected)
+
+        self.cbSelectAll.setCheckState(Qt.CheckState.Checked)
+        self.cbSelectAll.stateChanged.connect(self.on_select_all_changed)
+        self.btnConfirm.clicked.connect(self.on_confirm_clicked)
 
         self._populate_template_list()
 
+        self.splitMain.setSizes([200, 800])
         # self.show_schedule_by_date(self.edtFrom.date())
+
+        self.setWindowTitle("Schedule Viewer")
 
     def on_date_changed(self, date: QDate):
         self.show_schedule_by_date(date)
+
+    def _get_selected_dates(self) -> list:
+        dates = []
+        for i in range(self.lwDates.count()):
+            item = self.lwDates.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                dates.append(QDate.fromString(item.text(), "dd/MM/yyyy"))
+        return dates
+
+    def _get_selected_dates_as_string(self) -> list:
+        dates = []
+        for i in range(self.lwDates.count()):
+            item = self.lwDates.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                dates.append(item.text())
+        return dates
+
+
+    def _get_current_template(self):
+        current_item = self.lwTemplates.currentItem()
+        template = self.templates.get(current_item.text()) if current_item else None
+        return template
+
+    def on_confirm_clicked(self):
+        # Handle confirm button click
+        dates = self._get_selected_dates()
+        current_template = self._get_current_template()
+        if current_template is None:
+            return
+        summary = ScheduleSummaryDialog(current_template, dates, self.schedule_items, self)
+        summary.exec_()
+
+
+    def on_select_all_changed(self, state: Qt.CheckState):
+        for i in range(self.lwDates.count()):
+            item = self.lwDates.item(i)
+            item.setCheckState(state)
 
     def show_schedule_by_date(self, date):
         self._initilize_schedule_table()
         self._load_schedule_by_date(date)
 
-    def _populate_range_combo(self):
+    def _populate_dates_range_combo(self):
         self.cbRange.addItem("To")
         self.cbRange.addItem("Future")
 
@@ -70,6 +119,9 @@ class ViewScheduleDialog(widget, base):
         self.lwDates.clear()
         for date in dates:
             item = QListWidgetItem(date)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setData(Qt.CheckStateRole, Qt.CheckState.Checked)
+
             self.lwDates.addItem(item)
 
     def on_range_changed(self, index: int):
@@ -162,6 +214,18 @@ class ViewScheduleDialog(widget, base):
         self.twViewSchedule.setColumnWidth(7, 250)
 
         self.twViewSchedule.setHorizontalHeaderLabels(["Date", "Start", "Length", "Title", "Artist", "Category", "Filename", "Path" ])
+
+    def on_date_list_selected(self):
+        selected_dates = self._get_selected_dates_as_string()
+        self.filter_schedule_items(selected_dates)
+
+    def filter_schedule_items(self, selected_dates: list):
+        for row in range(self.twViewSchedule.rowCount()):
+            item_date = self.twViewSchedule.item(row, 0).text()
+            if item_date not in selected_dates:
+                self.twViewSchedule.hideRow(row)
+            else:
+                self.twViewSchedule.showRow(row)
 
     def on_delete_all_clicked(self):
         """ Delete all schedule items for the selected date and schedule ref"""

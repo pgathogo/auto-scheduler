@@ -1,0 +1,76 @@
+from PyQt5.QtCore import (
+    QObject,
+    pyqtSignal,
+    QThread
+)
+
+from mssql_data import MSSQLData
+from data_types import MSSQL_CONN
+
+
+class ScheduleValidator(QObject):
+
+    update_started = pyqtSignal()
+    update_progress = pyqtSignal(int, str)
+    update_completed = pyqtSignal(bool)
+
+    INFORMATION, WARNING, ERROR = range(3)
+
+    def __init__(self, current_template, dates, parent=None):
+        QObject.__init__(self, parent)
+        self.schedule = {}
+        self.current_template = current_template
+        self.dates = dates
+
+    def fetch_data(self):
+        dbconn =  MSSQLData(
+            MSSQL_CONN['server'], 
+            MSSQL_CONN['database'], 
+            MSSQL_CONN['username'], 
+            MSSQL_CONN['password'])
+
+        hours = ', '.join(map(str, self.current_template.hours()))
+        dates = ', '.join([f"'{date.toString('yyyy-MM-dd')}'" for date in self.dates])
+
+        if dbconn.connect():
+            query = f"""
+                SELECT ScheduleDate, count(*) AS cnt
+                FROM Schedule
+                WHERE ScheduleDate IN ({dates})
+                AND ScheduleHour IN ({hours})
+                AND ItemSource <> 'COMMS'
+                GROUP BY ScheduleDate
+                ORDER BY ScheduleDate
+            """
+
+            self.update_started.emit()
+            msg =  f"Fetching schedule data for dates: {dates} and hours: {hours}"
+            self.update_progress.emit(0, msg)
+
+            results = dbconn.execute_query(query)
+            for row in results:
+                sched_date = row[0].strftime("%Y-%m-%d")
+                self.update_progress.emit(ScheduleValidator.INFORMATION,
+                                           f"Processing schedule for date: {sched_date}")
+                self.schedule[sched_date] = row[1]
+            dbconn.disconnect()
+
+        self.update_completed.emit(True)
+        # return self.schedule
+
+    def get_schedule(self):
+        return self.schedule
+
+    def insert_data(self, statements: dict):
+        dbconn =  MSSQLData(
+            MSSQL_CONN['server'], 
+            MSSQL_CONN['database'], 
+            MSSQL_CONN['username'], 
+            MSSQL_CONN['password'])
+
+        if dbconn.connect():
+            for date, stmts in statements.items():
+                print(f"Insert statements for {date}: Count: {len(stmts)}")
+                mssql_inserts = "".join(stmts)
+                dbconn.execute_non_query(mssql_inserts)
+            dbconn.disconnect()

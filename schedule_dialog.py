@@ -630,7 +630,6 @@ class ScheduleDialog(widget, base):
 
        self.updater_thread.start()
 
-
     def confirm_save(self) ->bool:
         msgbox = QMessageBox(self)
         msgbox.setWindowTitle("Generate Schedule")
@@ -687,5 +686,3 @@ class ScheduleDialog(widget, base):
         msg.setWindowTitle("Message")
         msg.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg.exec_()
-
-        
