@@ -27,11 +27,8 @@ class ViewScheduleDialog(widget, base):
 
         self.db_config = DataConfiguration("")
 
-        # self.edtFrom.setDate(QDate.currentDate())
-        # self.edtTo.setDate(QDate.currentDate())
-
-        self.edtFrom.setDate(QDate.fromString("01/09/2025", "dd/MM/yyyy"))
-        self.edtTo.setDate(QDate.fromString("30/09/2025", "dd/MM/yyyy"))
+        self.edtFrom.setDate(QDate.currentDate())
+        self.edtTo.setDate(QDate.currentDate())
 
         self.schedule_items = []
         self.templates = {}
