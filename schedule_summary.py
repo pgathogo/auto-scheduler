@@ -235,7 +235,7 @@ class ScheduleSummaryDialog(widget, base):
         WHERE scheduleDate IN ({date_str})
           AND scheduleHour in  ({hour_str})
           AND ItemSource = 'SONG'
-          AND PlayStatus = 'CUED'
+          AND (PlayStatus = 'CUED' or PlayStatus = '')
         """
         return delete_stmt
 
