@@ -48,6 +48,8 @@ class ScheduleValidator(QObject):
             self.update_progress.emit(0, msg)
 
             results = dbconn.execute_query(query)
+            if results is None:
+                return
             for row in results:
                 sched_date = row[0].strftime("%Y-%m-%d")
                 self.update_progress.emit(ScheduleValidator.INFORMATION,
