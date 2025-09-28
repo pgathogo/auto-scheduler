@@ -8,6 +8,7 @@ from PyQt5.QtCore import (
 )
 
 from data_config import DataConfiguration
+from logging_handlers import EventLogger
 from template_item import ItemType
 from mssql_data import MSSQLData
 from data_types import MSSQL_CONN
@@ -26,21 +27,34 @@ class ScheduleUpdater(QObject):
 
     INFORMATION, WARNING, ERROR = range(0, 3)
 
-    def __init__(self, daily_schedule: dict, parent=None):
+    def __init__(self, daily_schedule: dict, logger: EventLogger, parent=None):
         QObject.__init__(self, parent)
         self.schedule = daily_schedule
         self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
+        self._logger = logger
+
+    def _log_info(self, msg: str):
+        self._logger.log_info(msg)
+
+    def _log_error(self, msg: str):
+        self._logger.log_error(msg)
+
+    def _batch_log(self, logs: list):
+        for log in logs:
+            self._log_info(log)
 
     def exec_(self):
         self.update_started.emit()
 
         mssql_stmts  = []
         sqlite_stmts = []
+        logs = []
 
         schedule_ref = self.get_schedule_ref()
         msg = f"Saving schedule reference: {schedule_ref}"
         self.update_progress.emit(0, msg)
+        self._log_info(msg)
 
         unique_hours_per_date = self.extract_unique_hours_per_date(self.schedule)
         
@@ -56,6 +70,7 @@ class ScheduleUpdater(QObject):
 
            msg = f"Saving schedule for date: {sched_date_fmtd}"
            self.update_progress.emit(0, msg)
+           self._log_info(msg)
 
            count = 0
            for key, item in schedule_items.items():
@@ -78,11 +93,11 @@ class ScheduleUpdater(QObject):
                    continue
 
                mssql_seq += 1
-               mssql_schedule_record = self._make_mssql_schedule_record(sched_date, schedule_ref, item, mssql_seq)
-               if mssql_schedule_record == "":
+               mssql_schedule_insert_stmt = self._make_mssql_insert_statement(sched_date, schedule_ref, item, mssql_seq)
+               if mssql_schedule_insert_stmt == "":
                    continue
 
-               mssql_stmts.append(mssql_schedule_record)
+               mssql_stmts.append(mssql_schedule_insert_stmt)
 
                sqlite_seq += 1
                sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
@@ -90,19 +105,37 @@ class ScheduleUpdater(QObject):
 
         msg = f"Creating data in Sedric database..."
         self.update_progress.emit(0, msg)
+        self._log_info(msg)
+        self._log_info(f"Total MSSQL statements to execute: {len(mssql_stmts)}")
 
         # MSSQL supports multiple statment execution
         mssql_all = "".join(mssql_stmts)
-        self.mssql_conn.execute_non_query(mssql_all)
+
+        self._log_info("Executing MSSQL statements...")
+
+        status, msg = self.mssql_conn.execute_non_query(mssql_all)
+
+        if not status:
+            msg = f"Error creating schedule in Sedric database. {msg}"
+            self.update_progress.emit(0, msg)
+            self._log_error(msg)
+            self.update_completed.emit(False)
+            return
+        else:
+            self._log_info("MSSQL statements executed successfully.")
 
         msg = f"Creating data schedule locally..."
         self.update_progress.emit(0, msg)
+        self._log_info(msg)
+        self._log_info(f"Total SQLite statements to execute: {len(sqlite_stmts)}")  
 
         # SQLite supports single statement execution
         for stmt in sqlite_stmts:
            self.db_config.execute_query(stmt)
 
         self.schedule_is_saved = True
+
+        self._log_info("Schedule saved successfully.")
 
         self.update_completed.emit(True)
 
@@ -146,13 +179,16 @@ class ScheduleUpdater(QObject):
         del_stmt_sqlite = self._make_delete_statement_sqlite(dates, unique_hours)
 
         # Execute statements
-        if self.mssql_conn.execute_non_query(del_stmt_mssql):
+        status, msg =  self.mssql_conn.execute_non_query(del_stmt_mssql)
+        if status:
             msg = f"Deleted {len(unique_hours)} hours from dates {dates} in Sedric database"
             self.update_progress.emit(0, msg)
+            self._log_info(msg)
 
             if not self.db_config.execute_query(del_stmt_sqlite):
                 msg = f"Error deleting {len(unique_hours)} hours from dates {dates} in local database"
                 self.update_progress.emit(0, msg)
+                self._log_error(msg)
                 return False
 
         return True
@@ -225,7 +261,7 @@ class ScheduleUpdater(QObject):
 
         return ins_stmt
 
-    def _make_mssql_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
+    def _make_mssql_insert_statement(self, sched_date: str, schedule_ref: int, item, seq: int):
         status = 'CUED'
         item_source = 'SONG'
         comm_audio = 'AUDIO'

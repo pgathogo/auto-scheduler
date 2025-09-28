@@ -1,3 +1,4 @@
+import os
 import time
 import random
 from collections import OrderedDict
@@ -19,6 +20,7 @@ from PyQt5.QtCore import (
     QDate,
     Qt,
     QTime,
+    QDateTime,
     QSize,
     QThread,
     QCoreApplication
@@ -26,7 +28,8 @@ from PyQt5.QtCore import (
 
 from PyQt5.QtGui import (
     QIcon,
-    QPalette
+    QPalette,
+    QPixmap
 )
 
 from template import Template
@@ -46,12 +49,22 @@ from template_item import (
 )
 
 from data_config import DataConfiguration
-
 from schedule_updater import ScheduleUpdater
+from schedule_summary import ScheduleSummaryDialog
+
+from logging_handlers import (
+    EventLogger, 
+    FileHandler, 
+    StdOutHandler
+)
 
 GENRE_ROTATION = {"N": "NONE", "R": "RANDOM"}
 
 widget, base = uic.loadUiType('schedule_dialog.ui')
+
+WAITING = 0
+GENERATED = 1
+SAVED = 2
 
 class ScheduleDialog(widget, base):
     def __init__(self, template: Template, tracks: OrderedDict):
@@ -97,6 +110,56 @@ class ScheduleDialog(widget, base):
 
         self.lblProgresText.setVisible(False)
 
+        self._logger = self._make_logger()
+
+        self.schedule_current_status = WAITING
+        self.schedule_status(WAITING)
+
+
+    def _make_logger(self) -> EventLogger:
+        dtime = QDateTime.currentDateTime().toString('ddMMyyyy_HHmm')
+        logfile = f"schedule_log_{dtime}.log"
+        # First check if logs directory exists, if not create it
+        if not os.path.exists("logs"):
+            os.makedirs("logs")
+        FileHandler.set_filepath(f"logs/{logfile}")
+        return EventLogger(handler=FileHandler)
+
+    def _log_info(self, msg: str):
+        self._logger.log_info(msg)
+
+    def _log_error(self, msg: str):
+        self._logger.log_error(msg)
+
+    def schedule_status(self, status:int):
+        if status == WAITING:
+            self.status_waiting()
+        elif status == GENERATED:
+            self.status_generated()
+            self.schedule_current_status = GENERATED
+        elif status == SAVED:
+            self.status_saved()
+            self.schedule_current_status = SAVED
+        else:
+            pass
+
+    def status_waiting(self):
+        self.lblStatus.setText("WAITING...")
+        pixmap = QPixmap("icons/yellow.png")
+        self.lblStatusImg.setPixmap(pixmap)
+        self.lblStatusImg.setScaledContents(True)
+
+    def status_generated(self):
+        self.lblStatus.setText("GENERATED")
+        pixmap = QPixmap("icons/red.png")
+        self.lblStatusImg.setPixmap(pixmap)
+        self.lblStatusImg.setScaledContents(True)
+
+    def status_saved(self):
+        self.lblStatus.setText("SAVED.")
+        pixmap = QPixmap("icons/green_2.png")
+        self.lblStatusImg.setPixmap(pixmap)
+        self.lblStatusImg.setScaledContents(True)
 
     def dow_text(self, dow: list) -> str:
         dow_text = {
@@ -240,13 +303,15 @@ class ScheduleDialog(widget, base):
 
     def on_generate_schedule(self):
 
-        print("Generating schedule...")
+        self._log_info("Generating schedule...")
 
         self.clear_generated_schedule()
 
         start_date = self.edtStartDate.date()
         dflt_start_date = start_date
         end_date = self.edtEndDate.date()
+
+        self._log_info(f"Generating schedule from {self._display_date_str(start_date)} to {self._display_date_str(end_date)}" )
 
         dow = self._template.dow()
 
@@ -275,6 +340,9 @@ class ScheduleDialog(widget, base):
 
             self._cache_generated_schedule(start_date, appended_list)
             self._add_date_to_table(start_date)
+
+            self._log_info(f"Schedule generated for {self._display_date_str(start_date)} - Items....: {len(processed_items)}")
+            
             start_date = start_date.addDays(1)
 
         sdate = self._db_date_str(dflt_start_date)
@@ -285,6 +353,8 @@ class ScheduleDialog(widget, base):
         self._populate_schedule_table(items)
 
         self.selected_date_str = sdate
+
+        self.schedule_status(GENERATED)
 
     def clear_generated_schedule(self):
         self._daily_schedule.clear()
@@ -615,7 +685,7 @@ class ScheduleDialog(widget, base):
        if not self.confirm_save():
            return
 
-       self.schedule_updater = ScheduleUpdater(self._daily_schedule)
+       self.schedule_updater = ScheduleUpdater(self._daily_schedule, self._logger)
        self.updater_thread = QThread(self)
        self.schedule_updater.moveToThread(self.updater_thread)
 
@@ -675,9 +745,32 @@ class ScheduleDialog(widget, base):
         self.lblProgresText.setVisible(False)
         if status:
             self.lblProgresText.setText("Schedule saved successfully!")
-            self.show_message("Schedule saved successfully!")
+            self.show_message("Schedule saved successfully. See summary window for details.")
         else:
             self.lblProgresText.setText("Schedule save failed!")
+
+        self.schedule_status(SAVED)
+        start_date = self.edtStartDate.date()
+        end_date = self.edtEndDate.date()
+        dates = self._get_date_range(start_date, end_date)
+        scheduled_items = self.db_config.fetch_schedule_by_template_and_date_range(self._template.id(), 
+                                                                                   start_date, end_date)
+        summary = ScheduleSummaryDialog(
+            current_template=self._template, 
+            dates=dates, 
+            schedule_items=scheduled_items, 
+            run_immediately=True, 
+            logger=self._logger,
+            parent=self
+        )
+        summary.exec_()
+
+    def _get_date_range(self, start_date, end_date):
+        dates = []
+        while start_date <= end_date:
+            dates.append(start_date)
+            start_date = start_date.addDays(1)
+        return dates
 
     def show_message(self, message:str):
         msg = QMessageBox(self)
@@ -687,6 +780,21 @@ class ScheduleDialog(widget, base):
         msg.exec_()
 
     def closeEvent(self, event):
-        self.updater_thread.quit()
-        self.updater_thread.wait()
+        if (self.schedule_current_status == GENERATED):
+            if not self.close_without_saving():
+                event.ignore()
+                return
         event.accept()
+
+    def close_without_saving(self) ->bool:
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Confirmation")
+        msg_box.setText("Are you sure you want to close without saving the schedule?")
+        # msg_box.setInformativeText("Do you want to close without saving schedule?")
+        msg_box.setStandardButtons(QMessageBox.Yes|QMessageBox.No)
+        msg_box.setDefaultButton(QMessageBox.No)
+
+        ret = msg_box.exec_()
+
+        return True if ret == QMessageBox.Yes else False
+

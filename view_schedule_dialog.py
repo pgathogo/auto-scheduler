@@ -1,8 +1,11 @@
+import os
+
 from PyQt5 import uic
 
 from PyQt5.QtWidgets import (
     QTableWidget,
-    QListWidgetItem
+    QListWidgetItem,
+    QFileDialog
 )
 
 from PyQt5.QtCore import (
@@ -10,12 +13,18 @@ from PyQt5.QtCore import (
     QDate,
 )
 
+
 from data_config import DataConfiguration
 from schedule_summary import ScheduleSummaryDialog
 
 from template_item import (
     BaseTableWidgetItem,
     ItemType
+)
+
+from logging_handlers import (
+    EventLogger,
+    FileHandler
 )
 
 widget, base = uic.loadUiType('view_schedule_dialog.ui')
@@ -46,13 +55,29 @@ class ViewScheduleDialog(widget, base):
         self.cbSelectAll.setCheckState(Qt.CheckState.Checked)
         self.cbSelectAll.stateChanged.connect(self.on_select_all_changed)
         self.btnConfirm.clicked.connect(self.on_confirm_clicked)
+        self.btnCopy.clicked.connect(self.on_copy_clicked)
 
         self._populate_template_list()
 
         self.splitMain.setSizes([200, 800])
-        # self.show_schedule_by_date(self.edtFrom.date())
 
         self.setWindowTitle("Schedule Viewer")
+
+        self._logger = self._make_logger()
+
+    def _make_logger(self):
+        dtime = QDate.currentDate().toString('ddMMyyyy_HHmm')
+        log_file = f"view_schedule_{dtime}.log"
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
+        FileHandler.set_filepath(f"logs/{log_file}")
+        return EventLogger(handler=FileHandler)
+
+    def _log_info(self, msg: str):
+        self._logger.log_info(msg)
+
+    def _log_error(self, msg: str):
+        self._logger.log_error(msg)
 
     def on_date_changed(self, date: QDate):
         self.show_schedule_by_date(date)
@@ -73,7 +98,6 @@ class ViewScheduleDialog(widget, base):
                 dates.append(item.text())
         return dates
 
-
     def _get_current_template(self):
         current_item = self.lwTemplates.currentItem()
         template = self.templates.get(current_item.text()) if current_item else None
@@ -85,9 +109,33 @@ class ViewScheduleDialog(widget, base):
         current_template = self._get_current_template()
         if current_template is None:
             return
-        summary = ScheduleSummaryDialog(current_template, dates, self.schedule_items, self)
+        summary = ScheduleSummaryDialog(
+            current_template = current_template,
+            dates = dates,
+            schedule_items = self.schedule_items,
+            run_immediately = False,
+            logger = self._logger,
+            parent = self
+        )
         summary.exec_()
 
+    def on_copy_clicked(self):
+        if len(self.schedule_items) == 0:
+            return
+        # Open folder dialog to select destination
+        self._log_info(f"Copying {len(self.schedule_items)} schedule items")
+        dest_folder = QFileDialog.getExistingDirectory(self, "Select Destination Folder")
+        if not dest_folder:
+            return
+        self._log_info(f"Destination folder selected: {dest_folder}")
+
+        for item in self.schedule_items:
+            # Pad zeroes to the front of track_id to make it a length of 8 string
+            filepath = f"{item.track_id():08d}.ogg"
+            src_filepath = item.item_path()+ filepath
+            dest_filepath = os.path.join(dest_folder, filepath)
+            # print(f"Copy File: {src_filepath} -> {dest_filepath}")
+            os.system(f"cp {src_filepath} {dest_filepath}")
 
     def on_select_all_changed(self, state: Qt.CheckState):
         for i in range(self.lwDates.count()):
@@ -129,6 +177,11 @@ class ViewScheduleDialog(widget, base):
 
     def on_template_changed(self, current: QListWidgetItem, previous: QListWidgetItem):
         if current:
+            template_name = current.text()
+            from_date = self.edtFrom.date().toString("dd/MM/yyyy")
+            to_date = self.edtTo.date().toString("dd/MM/yyyy")
+            self._log_info(f"Template '{template_name}' selected for date range {from_date} to {to_date}")
+
             template_id = current.data(Qt.ItemDataRole.UserRole)
 
             if self.cbRange.currentIndex() == 0:
@@ -138,6 +191,7 @@ class ViewScheduleDialog(widget, base):
                 self._load_schedule_by_template_and_date_range(template_id,
                                                             self.edtFrom.date(), None)
 
+
     def _load_schedule_by_date(self, date):
         self.schedule_items = self.db_config.fetch_schedule_by_date(date)
 
@@ -146,6 +200,7 @@ class ViewScheduleDialog(widget, base):
 
     def _load_schedule_by_template_and_date_range(self, template_id: int, start_date: QDate, end_date: QDate):
         self.schedule_items = self.db_config.fetch_schedule_by_template_and_date_range(template_id, start_date, end_date)
+        self._log_info(f"Loaded {len(self.schedule_items)} schedule items") 
 
         self._initilize_schedule_table()
 
@@ -224,22 +279,4 @@ class ViewScheduleDialog(widget, base):
             else:
                 self.twViewSchedule.showRow(row)
 
-    def on_delete_all_clicked(self):
-        """ Delete all schedule items for the selected date and schedule ref"""
-        # Extract all schedule reference from the schedule items
-        if not self.schedule_items:
-            return
-
-        schedule_refs = {item.schedule_ref() for item in self.schedule_items}
-
-        if not schedule_refs:
-            return
-
-        date = self.edtFrom.date().toString("yyyy-MM-dd")
-
-        if not date:
-            return
-
-
-        self.db_config.delete_schedule_by_date(date, schedule_refs)
 
