@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from PyQt5 import uic
 
@@ -137,8 +138,13 @@ class ViewScheduleDialog(widget, base):
             # Check if dest_file exitst
             if os.path.exists(dest_filepath):
                 continue
+
             print(f"Copy File: {src_filepath} -> {dest_filepath}")
-            os.system(f"cp {src_filepath} {dest_filepath}")
+            try:
+                shutil.copyfile(src_filepath, dest_filepath)
+            except Exception as e:
+                print(f"Error copying file: {e}")
+
 
     def on_select_all_changed(self, state: Qt.CheckState):
         for i in range(self.lwDates.count()):
