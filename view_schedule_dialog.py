@@ -134,7 +134,7 @@ class ViewScheduleDialog(widget, base):
             filepath = f"{item.track_id():08d}.ogg"
             src_filepath = item.item_path()+ filepath
             dest_filepath = os.path.join(dest_folder, filepath)
-            # print(f"Copy File: {src_filepath} -> {dest_filepath}")
+            print(f"Copy File: {src_filepath} -> {dest_filepath}")
             os.system(f"cp {src_filepath} {dest_filepath}")
 
     def on_select_all_changed(self, state: Qt.CheckState):
