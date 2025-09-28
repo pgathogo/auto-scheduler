@@ -130,20 +130,28 @@ class ViewScheduleDialog(widget, base):
             return
         self._log_info(f"Destination folder selected: {dest_folder}")
 
+        files_to_copy = []
         for item in self.schedule_items:
             # Pad zeroes to the front of track_id to make it a length of 8 string
             filepath = f"{item.track_id():08d}.ogg"
+            # Change item_path "\\" to "//" and "\" to "/"
             src_filepath = item.item_path()+ filepath
             dest_filepath = os.path.join(dest_folder, filepath)
             # Check if dest_file exitst
             if os.path.exists(dest_filepath):
                 continue
-
-            print(f"Copy File: {src_filepath} -> {dest_filepath}")
             try:
-                shutil.copyfile(src_filepath, dest_filepath)
+                print(f"Copy File: {src_filepath} -> {dest_filepath}")
+                copy_cmd = f"cp {src_filepath} {dest_filepath}"
+                files_to_copy.append(copy_cmd)
+                # Write copy_cmd to a file
             except Exception as e:
                 print(f"Error copying file: {e}")
+
+        with open("logs/copy_commands.sh", "w") as f:
+            f.write("#!/bin/bash\n")
+            for cmd in files_to_copy:
+                f.write(f"{cmd}\n")
 
 
     def on_select_all_changed(self, state: Qt.CheckState):
