@@ -134,7 +134,6 @@ class ViewScheduleDialog(widget, base):
         for item in self.schedule_items:
             # Pad zeroes to the front of track_id to make it a length of 8 string
             filepath = f"{item.track_id():08d}.ogg"
-            # Change item_path "\\" to "//" and "\" to "/"
             src_filepath = item.item_path()+ filepath
             dest_filepath = os.path.join(dest_folder, filepath)
             # Check if dest_file exitst
@@ -142,16 +141,17 @@ class ViewScheduleDialog(widget, base):
                 continue
             try:
                 print(f"Copy File: {src_filepath} -> {dest_filepath}")
-                copy_cmd = f"cp {src_filepath} {dest_filepath}"
-                files_to_copy.append(copy_cmd)
+                shutil.copy2(src_filepath, dest_filepath)
+                #copy_cmd = f"cp {src_filepath} {dest_filepath}"
+                #files_to_copy.append(copy_cmd)
                 # Write copy_cmd to a file
             except Exception as e:
                 print(f"Error copying file: {e}")
 
-        with open("logs/copy_commands.sh", "w") as f:
-            f.write("#!/bin/bash\n")
-            for cmd in files_to_copy:
-                f.write(f"{cmd}\n")
+        # with open("logs/copy_commands.sh", "w") as f:
+        #     f.write("#!/bin/bash\n")
+        #     for cmd in files_to_copy:
+        #         f.write(f"{cmd}\n")
 
         print("Copy commands written to logs/copy_commands.sh")
 
