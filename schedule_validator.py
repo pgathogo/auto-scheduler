@@ -50,9 +50,7 @@ class ScheduleValidator(QObject):
             results = dbconn.execute_query(query)
             if results is None:
                 dbconn.disconnect()
-                self.update_completed.emit(False)
-                msg = "Error: Query did not return any results."
-                self.update_completed.emit(False, msg)
+                self.update_completed.emit(False, "Error: Query did not return any results.")
                 return
 
             for row in results:
