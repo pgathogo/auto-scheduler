@@ -12,7 +12,7 @@ class ScheduleValidator(QObject):
 
     update_started = pyqtSignal()
     update_progress = pyqtSignal(int, str)
-    update_completed = pyqtSignal(bool)
+    update_completed = pyqtSignal(bool, str)
 
     INFORMATION, WARNING, ERROR = range(3)
 
@@ -51,6 +51,8 @@ class ScheduleValidator(QObject):
             if results is None:
                 dbconn.disconnect()
                 self.update_completed.emit(False)
+                msg = "Error: Query did not return any results."
+                self.update_completed.emit(False, msg)
                 return
 
             for row in results:
@@ -60,7 +62,8 @@ class ScheduleValidator(QObject):
                 self.schedule[sched_date] = row[1]
             dbconn.disconnect()
 
-        self.update_completed.emit(True)
+        msg = f"Fetched {len(self.schedule)} schedule dates."                                                                                       
+        self.update_completed.emit(True, msg)
         # return self.schedule
 
     def get_schedule(self):

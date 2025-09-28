@@ -27,13 +27,15 @@ from schedule_validator import ScheduleValidator
 widget, base = uic.loadUiType('schedule_summary.ui')
 
 class ScheduleSummaryDialog(widget, base):
-    def __init__(self, current_template:'Template', dates:list, schedule_items:list, parent=None):
-        super(ScheduleSummaryDialog, self).__init__(parent)
+    def __init__(self, **kwargs):
+        super(ScheduleSummaryDialog, self).__init__(kwargs.get('parent', None))
         self.setupUi(self)
 
-        self.current_template = current_template
-        self.dates = dates
-        self.schedule_items = schedule_items
+        self.current_template = kwargs.get('current_template', None)
+        self.dates = kwargs.get('dates', [])
+        self.schedule_items = kwargs.get('schedule_items', [])
+        self.run_immediately = kwargs.get('run_immediately', False) 
+        self.logger = kwargs.get('logger', None)
 
         # ---- thread
         self.schedule_validator = ScheduleValidator(self.current_template, self.dates)
@@ -65,6 +67,11 @@ class ScheduleSummaryDialog(widget, base):
         self.lblDows.setText(dows)
 
         self.setWindowTitle(f"Schedule Summary - {self.current_template.name()}")
+
+
+    def showEvent(self, event):
+        if self.run_immediately:
+            self.on_run_check()
 
 
     def on_select_all_changed(self, state: Qt.CheckState):
@@ -335,14 +342,15 @@ class ScheduleSummaryDialog(widget, base):
         self.lblStatus.setText("Update started...")
         self.lblStatus.repaint()
 
-    def on_update_completed(self, success):
+    def on_update_completed(self, success, message: str):
         self.btnRunCheck.setEnabled(True)
         self.btnCreate.setEnabled(True)
         self.btnDelete.setEnabled(True)
         self.btnClose.setEnabled(True)
         self.progressBar.setVisible(False)
         if success:
-            self.lblStatus.setText("Check completed successfully.")
+            msg = f"Validation completed successfully: {message}"
+            self.lblStatus.setText(msg)
             oats_sched = self.schedule_validator.get_schedule()
             gen_schedule = self.group_schedule_items_by_date(self.schedule_items, self.dates)
             self.add_summary_items(gen_schedule, oats_sched)
