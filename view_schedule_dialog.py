@@ -153,6 +153,8 @@ class ViewScheduleDialog(widget, base):
             for cmd in files_to_copy:
                 f.write(f"{cmd}\n")
 
+        print("Copy commands written to logs/copy_commands.sh")
+
 
     def on_select_all_changed(self, state: Qt.CheckState):
         for i in range(self.lwDates.count()):
