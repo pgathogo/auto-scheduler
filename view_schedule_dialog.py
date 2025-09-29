@@ -69,7 +69,7 @@ class ViewScheduleDialog(widget, base):
         self._logger = self._make_logger()
 
     def _make_logger(self):
-        dtime = QDateTime.currentDate().toString('ddMMyyyy_HHmm')
+        dtime = QDateTime.currentDateTime().toString('ddMMyyyy_HHmm')
         log_file = f"view_schedule_{dtime}.log"
         if not os.path.exists('logs'):
             os.makedirs('logs')
