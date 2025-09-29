@@ -64,7 +64,8 @@ widget, base = uic.loadUiType('schedule_dialog.ui')
 
 WAITING = 0
 GENERATED = 1
-SAVED = 2
+SAVING = 2
+SAVED = 3
 
 class ScheduleDialog(widget, base):
     def __init__(self, template: Template, tracks: OrderedDict):
@@ -112,6 +113,7 @@ class ScheduleDialog(widget, base):
 
         self._logger = self._make_logger()
 
+        self.updater_thread = QThread(self)
         self.schedule_current_status = WAITING
         self.schedule_status(WAITING)
 
@@ -137,6 +139,9 @@ class ScheduleDialog(widget, base):
         elif status == GENERATED:
             self.status_generated()
             self.schedule_current_status = GENERATED
+        elif status == SAVING:
+            self.status_saving()
+            self.schedule_current_status = SAVING
         elif status == SAVED:
             self.status_saved()
             self.schedule_current_status = SAVED
@@ -147,19 +152,21 @@ class ScheduleDialog(widget, base):
         self.lblStatus.setText("WAITING...")
         pixmap = QPixmap("icons/yellow.png")
         self.lblStatusImg.setPixmap(pixmap)
-        self.lblStatusImg.setScaledContents(True)
 
     def status_generated(self):
-        self.lblStatus.setText("GENERATED")
+        self.lblStatus.setText("SCHEDULE GENERATED")
         pixmap = QPixmap("icons/red.png")
         self.lblStatusImg.setPixmap(pixmap)
-        self.lblStatusImg.setScaledContents(True)
+
+    def status_saving(self):
+        self.lblStatus.setText("SAVING SCHEDULE...")
+        pixmap = QPixmap("icons/warning_triangle.png")
+        self.lblStatusImg.setPixmap(pixmap)
 
     def status_saved(self):
-        self.lblStatus.setText("SAVED.")
+        self.lblStatus.setText("SCHEDULE SAVED.")
         pixmap = QPixmap("icons/green_2.png")
         self.lblStatusImg.setPixmap(pixmap)
-        self.lblStatusImg.setScaledContents(True)
 
     def dow_text(self, dow: list) -> str:
         dow_text = {
@@ -685,8 +692,9 @@ class ScheduleDialog(widget, base):
        if not self.confirm_save():
            return
 
+       self.schedule_status(SAVING)
+
        self.schedule_updater = ScheduleUpdater(self._daily_schedule, self._logger)
-       self.updater_thread = QThread(self)
        self.schedule_updater.moveToThread(self.updater_thread)
 
        # Connect updater signals
@@ -752,12 +760,12 @@ class ScheduleDialog(widget, base):
         self.schedule_status(SAVED)
         start_date = self.edtStartDate.date()
         end_date = self.edtEndDate.date()
-        dates = self._get_date_range(start_date, end_date)
+        date_range = self._get_date_range(start_date, end_date)
         scheduled_items = self.db_config.fetch_schedule_by_template_and_date_range(self._template.id(), 
                                                                                    start_date, end_date)
         summary = ScheduleSummaryDialog(
             current_template=self._template, 
-            dates=dates, 
+            dates=date_range, 
             schedule_items=scheduled_items, 
             run_immediately=True, 
             logger=self._logger,
@@ -784,6 +792,8 @@ class ScheduleDialog(widget, base):
             if not self.close_without_saving():
                 event.ignore()
                 return
+        self.updater_thread.quit()
+        self.updater_thread.wait()
         event.accept()
 
     def close_without_saving(self) ->bool:

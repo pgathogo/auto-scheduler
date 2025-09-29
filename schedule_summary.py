@@ -11,7 +11,8 @@ from PyQt5 import uic
 
 from PyQt5.QtCore import (
     Qt,
-    QThread
+    QThread,
+    QDate
 )
 
 from mssql_data import MSSQLData
@@ -53,7 +54,8 @@ class ScheduleSummaryDialog(widget, base):
 
         self.btnRunCheck.clicked.connect(self.on_run_check)
         self.btnCreate.clicked.connect(self.on_create)
-        self.btnDelete.clicked.connect(self.on_delete)
+        self.btnDelete.clicked.connect(self.on_delete_scheduled)
+        self.btnDeleteAll.clicked.connect(self.on_delete_all)
         self.btnClose.clicked.connect(self.close)
 
         self.cbSelectAll.setCheckState(Qt.CheckState.Checked)
@@ -135,31 +137,87 @@ class ScheduleSummaryDialog(widget, base):
         self._execute_insert_statement(insert_stmts)
         return True
 
-    def on_delete(self):
+    def on_delete_scheduled(self):
         if self.twSummary.rowCount() == 0:
             return
         if QMessageBox.question(self, "Confirm Delete", "Are you sure you want to delete the selected schedules?",
                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
-            if self._delete_data():
+            if self._delete_scheduled_data():
                 self.show_message("Schedule deleted successfully.")
                 self.re_run_check()
 
-    def _delete_data(self) -> bool:
+    def _get_delete_dates(self) -> list:
         dates = []
+        todays_date = QDate.currentDate().toString("yyyy-MM-dd")
+
         for row in range(self.twSummary.rowCount()):
             check_item = self.twSummary.item(row, 0)
-            oats_count = int(self.twSummary.item(row, 3).text())
-            if check_item.checkState() == Qt.CheckState.Checked and oats_count > 0:
+            if check_item.checkState() == Qt.CheckState.Checked:
                 date_item = self.twSummary.item(row, 1)
-                dates.append(date_item.text())
+                # Only future dates can be deleted
+                if date_item.text() >= todays_date:
+                    dates.append(date_item.text())
+        return dates
 
+    def _delete_scheduled_data(self) -> bool:
+        dates = self._get_delete_dates()
         if len(dates) == 0:
             self.show_message("No valid schedules selected for deletion.")
             return False
 
-        delete_stmt = self._make_delete_statement(dates, self.current_template.hours())
+        delete_stmt = self._make_delete_stmt_for_scheduled_data(dates, self.current_template.hours())
         self._execute_delete_statement(delete_stmt)
         return True
+
+    def on_delete_all(self):
+        if self.twSummary.rowCount() == 0:
+            return
+        if QMessageBox.question(self, "Confirm Delete", "Are you sure you want to delete ALL selected schedules?",
+                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+            if self._delete_all_data():
+                self.show_message("All selected schedules deleted successfully.")
+                self.re_run_check()
+
+    def _delete_all_data(self) -> bool:
+        dates = self._get_delete_dates()
+        if len(dates) == 0:
+            self.show_message("No valid schedules selected for deletion.")
+            return False
+
+        # Delete from MSSQL database
+        delete_stmt = self._make_delete_stmt_for_scheduled_data(dates, self.current_template.hours())
+
+        self.logger.log_info(f"MSSQL:Deleting scheduled data with statement: {delete_stmt}")
+
+        status, msg = self._execute_delete_statement(delete_stmt)
+
+        if not status:
+            log_msg = f"Error deleting scheduled data: {msg}"
+            self.show_message(log_msg)
+            self.logger.log_error(log_msg)
+            return False
+
+        self.logger.log_info(f"Deleted scheduled from MSSQL successfully.")
+
+        # Delete from SQLite database
+
+        delete_stmt = self._make_delete_stmt_for_generated_data(dates, self.current_template.hours())
+        dc = DataConfiguration("")
+
+        self.logger.log_info(f"LOCAL:Deleting all data with statement: {delete_stmt}")
+        result = dc.execute_query(delete_stmt)
+        if not result:
+            log_msg = "Error deleting all scheduled data from local database."
+            self.show_message(log_msg)
+            self.logger.log_error(log_msg)
+            return False
+
+        # Delete from local cache
+        self.schedule_items = [si for si in self.schedule_items if si.schedule_date().toString("yyyy-MM-dd") not in dates]
+        self.logger.log_info(f"Deleted all scheduled data from local cache successfully.")
+
+        return True
+
 
     def group_schedule_items_by_date(self, schedule_items:list, dates: list) -> dict:
         dates = [si.schedule_date().toString("yyyy-MM-dd") for si in schedule_items
@@ -233,7 +291,7 @@ class ScheduleSummaryDialog(widget, base):
 
         return insert_stmts
 
-    def _make_delete_statement(self, dates: list, hours: list) -> str:
+    def _make_delete_stmt_for_scheduled_data(self, dates: list, hours: list) -> str:
         date_str = ', '.join([f"'{date}'" for date in dates])
         hour_str = ', '.join(map(str, hours))
 
@@ -243,6 +301,17 @@ class ScheduleSummaryDialog(widget, base):
           AND scheduleHour in  ({hour_str})
           AND ItemSource <> 'COMMS'
           AND (PlayStatus = 'CUED' or PlayStatus = '')
+        """
+        return delete_stmt
+
+    def _make_delete_stmt_for_generated_data(self, dates: list, hours: list) -> str:
+        date_str = ', '.join([f"'{date}'" for date in dates])
+        hour_str = ', '.join(map(str, hours))
+
+        delete_stmt = f"""
+        DELETE FROM Schedule
+        WHERE schedule_date IN ({date_str})
+          AND schedule_hour in  ({hour_str})
         """
         return delete_stmt
 
@@ -297,9 +366,12 @@ class ScheduleSummaryDialog(widget, base):
             MSSQL_CONN['username'], 
             MSSQL_CONN['password'])
 
+        status = False
+        msg = "Failed to Connect."
         if dbconn.connect():
-            dbconn.execute_non_query(statement)
+            status, msg = dbconn.execute_non_query(statement)
             dbconn.disconnect()
+        return status, msg
 
     def _get_dow_names(self, dow: list):
         dow_names = []
@@ -325,7 +397,7 @@ class ScheduleSummaryDialog(widget, base):
         self.btnCreate.setEnabled(False)
         self.btnDelete.setEnabled(False)
         self.btnClose.setEnabled(False)
-        self.lblStatus.setText("Check started...")
+        self.lblStatus.setText("Validation started...")
 
         self.progressBar.setVisible(True)
         self.progressBar.reset()
@@ -355,12 +427,12 @@ class ScheduleSummaryDialog(widget, base):
             gen_schedule = self.group_schedule_items_by_date(self.schedule_items, self.dates)
             self.add_summary_items(gen_schedule, oats_sched)
         else:
-            self.lblStatus.setText("Check failed.")
+            self.lblStatus.setText("Validation failed.")
 
         self.lblStatus.repaint()
 
     def on_update_progress(self, percent: int, message: str):
-        self.lblStatus.setText(f"Check in progress... {percent}%")
+        self.lblStatus.setText(f"Validation in progress... {percent}%")
         self.lblStatus.repaint()
 
     def closeEvent(self, event):

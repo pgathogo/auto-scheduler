@@ -6,12 +6,14 @@ from PyQt5 import uic
 from PyQt5.QtWidgets import (
     QTableWidget,
     QListWidgetItem,
-    QFileDialog
+    QFileDialog,
+    QDialog
 )
 
 from PyQt5.QtCore import (
     Qt,
     QDate,
+    QDateTime   
 )
 
 
@@ -43,8 +45,8 @@ class ViewScheduleDialog(widget, base):
         self.schedule_items = []
         self.templates = {}
 
-        # self.edtFrom.dateChanged.connect(self.on_date_changed)
-        # self.edtTo.dateChanged.connect(self.on_date_changed)
+        self.edtFrom.dateChanged.connect(self.on_date_changed)
+        self.edtTo.dateChanged.connect(self.on_date_changed)
 
         self._populate_dates_range_combo()
         self.cbRange.currentIndexChanged.connect(self.on_range_changed)
@@ -67,7 +69,7 @@ class ViewScheduleDialog(widget, base):
         self._logger = self._make_logger()
 
     def _make_logger(self):
-        dtime = QDate.currentDate().toString('ddMMyyyy_HHmm')
+        dtime = QDateTime.currentDate().toString('ddMMyyyy_HHmm')
         log_file = f"view_schedule_{dtime}.log"
         if not os.path.exists('logs'):
             os.makedirs('logs')
@@ -81,7 +83,10 @@ class ViewScheduleDialog(widget, base):
         self._logger.log_error(msg)
 
     def on_date_changed(self, date: QDate):
-        self.show_schedule_by_date(date)
+        current_template = self.lwTemplates.currentItem()
+        if current_template is None:
+            return
+        self._show_data_for_template(current_template)
 
     def _get_selected_dates(self) -> list:
         dates = []
@@ -118,7 +123,8 @@ class ViewScheduleDialog(widget, base):
             logger = self._logger,
             parent = self
         )
-        summary.exec_()
+        result = summary.exec_()
+        self.on_date_changed(self.edtFrom.date())
 
     def on_copy_clicked(self):
         if len(self.schedule_items) == 0:
@@ -142,18 +148,13 @@ class ViewScheduleDialog(widget, base):
             try:
                 print(f"Copy File: {src_filepath} -> {dest_filepath}")
                 shutil.copy2(src_filepath, dest_filepath)
-                #copy_cmd = f"cp {src_filepath} {dest_filepath}"
-                #files_to_copy.append(copy_cmd)
-                # Write copy_cmd to a file
             except Exception as e:
                 print(f"Error copying file: {e}")
+                self._log_error(f"Error copying file: {e}")
+                continue
 
-        # with open("logs/copy_commands.sh", "w") as f:
-        #     f.write("#!/bin/bash\n")
-        #     for cmd in files_to_copy:
-        #         f.write(f"{cmd}\n")
-
-        print("Copy commands written to logs/copy_commands.sh")
+        print("Audio copy operation completed.")
+        self._log_info("Audio copy operation completed.")
 
 
     def on_select_all_changed(self, state: Qt.CheckState):
@@ -196,6 +197,9 @@ class ViewScheduleDialog(widget, base):
 
     def on_template_changed(self, current: QListWidgetItem, previous: QListWidgetItem):
         if current:
+            self._show_data_for_template(current)
+
+    def _show_data_for_template(self, current: QListWidgetItem):
             template_name = current.text()
             from_date = self.edtFrom.date().toString("dd/MM/yyyy")
             to_date = self.edtTo.date().toString("dd/MM/yyyy")

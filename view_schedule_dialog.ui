@@ -56,6 +56,12 @@
        </item>
        <item>
         <widget class="QDateEdit" name="edtTo">
+         <property name="minimumSize">
+          <size>
+           <width>150</width>
+           <height>0</height>
+          </size>
+         </property>
          <property name="buttonSymbols">
           <enum>QAbstractSpinBox::UpDownArrows</enum>
          </property>

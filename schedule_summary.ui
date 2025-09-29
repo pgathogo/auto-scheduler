@@ -96,7 +96,7 @@
      <item>
       <widget class="QPushButton" name="btnRunCheck">
        <property name="text">
-        <string>Run Check</string>
+        <string>Validate Schedule</string>
        </property>
       </widget>
      </item>
@@ -110,14 +110,28 @@
      <item>
       <widget class="QPushButton" name="btnCreate">
        <property name="text">
-        <string>Create</string>
+        <string>Re-Create Schedule</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="Line" name="line_4">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
        </property>
       </widget>
      </item>
      <item>
       <widget class="QPushButton" name="btnDelete">
        <property name="text">
-        <string>Delete</string>
+        <string>Delete Scheduled ONLY</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btnDeleteAll">
+       <property name="text">
+        <string>Delete ALL</string>
        </property>
       </widget>
      </item>
