@@ -59,6 +59,7 @@ class ViewScheduleDialog(widget, base):
         self.cbSelectAll.stateChanged.connect(self.on_select_all_changed)
         self.btnConfirm.clicked.connect(self.on_confirm_clicked)
         self.btnCopy.clicked.connect(self.on_copy_clicked)
+        self.btnCopy.setVisible(False)
 
         self._populate_template_list()
 
