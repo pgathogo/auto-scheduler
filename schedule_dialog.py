@@ -287,7 +287,7 @@ class ScheduleDialog(widget, base):
         selected_hours = self._get_selected_hours()
         self._show_selected_hours(selected_hours)
 
-    def _get_selected_hours(self):
+    def _get_selected_hours(self) ->list[int]:
         selected_hours = []
         # Selected hours are the items that are checked
         for i in range(self.lwHours.count()):
@@ -334,9 +334,16 @@ class ScheduleDialog(widget, base):
 
             template_items = list(self._template.template_items().values())
 
+            selected_hours = self._get_selected_hours()
+
+            print(f"Selected hours: {selected_hours}")
+
             # Remove empty items
             schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY 
-                              and item.db_action() != DBAction.DELETE]
+                              and item.db_action() != DBAction.DELETE and item.hour() in selected_hours]
+
+
+            print(schedule_items)
 
             # Maintain the order of items in the template based on how they were inserted
             schedule_items.sort(key=lambda item: item.item_row())
@@ -477,19 +484,20 @@ class ScheduleDialog(widget, base):
                 if item.hour() == hour and item.start_time().toString("hh:mm:ss") != "":
                     items.append(item)
 
-            header_item = items.pop(0)
+            if len(items) > 0:
+                header_item = items.pop(0)
 
-            mixed_items = items + hour_comm_breaks
-            
-            mixed_items.sort(key=lambda x: x.start_time())
+                mixed_items = items + hour_comm_breaks
+                
+                mixed_items.sort(key=lambda x: x.start_time())
 
-            self._compute_hourly_start_times(mixed_items)
-            clean_items = [item for item in mixed_items if item.start_time() != None ]
+                self._compute_hourly_start_times(mixed_items)
+                clean_items = [item for item in mixed_items if item.start_time() != None ]
 
-            #mixed_items.insert(0, header_item)
-            #appended_list += mixed_items
-            clean_items.insert(0, header_item)
-            appended_list += clean_items
+                #mixed_items.insert(0, header_item)
+                #appended_list += mixed_items
+                clean_items.insert(0, header_item)
+                appended_list += clean_items
 
         return appended_list
 
