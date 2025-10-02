@@ -187,8 +187,10 @@ class ScheduleSummaryDialog(widget, base):
             self.twSummary.setItem(row, 1, QTableWidgetItem(date))
             col = 2
             for hour in hours:
-                oats_value = oats_schedule[date].get(hour, 0)
-                cell_value = f"{str(hours_count.get(hour, 0))},{oats_value}"
+                if date not in oats_schedule:
+                    oats_schedule[date] = {}
+                # oats_value = oats_schedule[date].get(hour, 0)
+                # cell_value = f"{str(hours_count.get(hour, 0))},{oats_value}"
 
                 cell_widget = CellWidget(hours_count.get(hour, 0),
                                          oats_schedule[date].get(hour, 0))
