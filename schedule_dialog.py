@@ -336,14 +336,9 @@ class ScheduleDialog(widget, base):
 
             selected_hours = self._get_selected_hours()
 
-            print(f"Selected hours: {selected_hours}")
-
-            # Remove empty items
+            # Remove empty, deleted, or items that don't match selected hours
             schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY 
                               and item.db_action() != DBAction.DELETE and item.hour() in selected_hours]
-
-
-            print(schedule_items)
 
             # Maintain the order of items in the template based on how they were inserted
             schedule_items.sort(key=lambda item: item.item_row())

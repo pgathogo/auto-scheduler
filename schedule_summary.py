@@ -4,7 +4,10 @@ from PyQt5.QtWidgets import (
     QApplication,
     QTableWidget,
     QTableWidgetItem,
-    QMessageBox
+    QMessageBox,
+    QWidget,
+    QPushButton,
+    QHBoxLayout
 )
 
 from PyQt5 import uic
@@ -24,8 +27,69 @@ from data_types import (
 
 from schedule_validator import ScheduleValidator
 
-
 widget, base = uic.loadUiType('schedule_summary.ui')
+
+
+class CellWidget(QWidget):
+    def __init__(self, left_value:int, right_value:int, parent=None):
+        super().__init__(parent)
+        self.left_value = left_value
+        self.right_value = right_value
+        self._left_button, self._right_button = self._make_buttons(left_value, right_value)
+
+        hl = QHBoxLayout()
+        hl.setContentsMargins(0,0,0,0)
+        hl.setSpacing(0)
+        hl.addWidget(self._left_button)
+        hl.addWidget(self._right_button)
+        self.setLayout(hl)
+
+    def _make_button(self, button_value: int):
+        style_for_zero_value = "color: white; background-color: red; font-weight: bold;"
+        button = QPushButton(str(button_value))
+        button.setFixedSize(50, 30)
+        if button_value == 0:
+            button.setStyleSheet(style_for_zero_value)
+        return button
+
+    def _make_buttons(self, lvalue: int, rvalue: int) -> tuple:
+        style_left_button = "background-color: rgb(245, 255, 206); border-radius:1px; " \
+                            " min-width: 50px; min-height: 30px"
+        style_right_button = "background-color: rgb(198, 214, 255); border-radius:1px;" \
+                            "min-width: 50px; min-height: 30px;"
+        style_zero_lvalue = "color: white; background-color: red; font-weight: bold;" \
+                            "border-radius:1px;min-width: 50px; min-height:30px; "
+        style_zero_rvalue = "color: white; background-color: red; font-weight: bold;" \
+                            "border-radius:1px;min-width: 50px; min-height:30px; "
+        style_lvalue_less_rvalue = "color: red; background-color: rgb(245, 255, 206);" \
+                            " font-weight: bold; border-radius: 1px;" \
+                            " min-width: 50px; min-height: 30px;"
+        style_rvalue_less_lvalue = "color: red;  background-color: rgb(198, 214,255);" \
+                            "font-weight: bold; border-radius:1px;" \
+                            "min-width: 50px; min-height: 30px;"
+
+        left_button = QPushButton(str(lvalue))
+        left_button.setStyleSheet(style_left_button)
+        right_button = QPushButton(str(rvalue))
+        right_button.setStyleSheet(style_right_button)
+
+        if lvalue < rvalue:
+            left_button.setStyleSheet(style_lvalue_less_rvalue)
+        if rvalue < lvalue:
+            right_button.setStyleSheet(style_rvalue_less_lvalue)
+        if lvalue == 0:
+            left_button.setStyleSheet(style_zero_lvalue)
+        if rvalue == 0:
+            right_button.setStyleSheet(style_zero_rvalue)
+
+        return left_button, right_button
+
+    def left_button(self) -> QPushButton:
+        return self._left_button
+    
+    def right_button(self) -> QPushButton:
+        return self._right_button
+
 
 class ScheduleSummaryDialog(widget, base):
     def __init__(self, **kwargs):
@@ -75,41 +139,80 @@ class ScheduleSummaryDialog(widget, base):
         if self.run_immediately:
             self.on_run_check()
 
-
     def on_select_all_changed(self, state: Qt.CheckState):
         for row in range(self.twSummary.rowCount()):
             check_item = self.twSummary.item(row, 0)
             if check_item:
                 check_item.setData(Qt.CheckStateRole, state)
 
-    def _prepare_summary_table(self):
+    def _prepare_summary_table(self, hours: list[int]):
+        columns = ["Select", "Date"]
+        for hour in hours:
+            columns.append(f"HR:{str(hour)}")
+        columns.append("Total")
+
         self.twSummary.setRowCount(0)
-        self.twSummary.setColumnCount(4)
-        self.twSummary.setHorizontalHeaderLabels(["Select","Date", "Generated Items",
-                                                   "Scheduled Items"])
+        self.twSummary.setColumnCount(len(columns))
+        self.twSummary.setHorizontalHeaderLabels(columns)
         self.twSummary.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
 
-    def add_summary_items(self,auto_schedule: dict, oats_schedule:dict):
-        self._prepare_summary_table()
+    def add_summary_itemsXX(self,auto_schedule: dict, oats_schedule:dict):
+        self._prepare_summary_table(self.current_template.hours())
         for date, count in auto_schedule.items():
             row = self.twSummary.rowCount()
             self.twSummary.insertRow(row)
             select_item = QTableWidgetItem()
             select_item.setFlags(select_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            #oats_count = oats_schedule.get(date, 0)
             select_item.setData(Qt.CheckStateRole, Qt.CheckState.Checked)
+            select_item.setTextAlignment(Qt.AlignCenter)
+
             self.twSummary.setItem(row, 0, select_item)
             self.twSummary.setItem(row, 1, QTableWidgetItem(date))
             self.twSummary.setItem(row, 2, QTableWidgetItem(str(count)))
             self.twSummary.setItem(row, 3, QTableWidgetItem(str(oats_schedule.get(date, 0))))
+    
+    def add_summary_items(self, auto_schedule: dict, oats_schedule: dict, hours: list[int]):
+        self._prepare_summary_table(self.current_template.hours())
+        for date, hours_count in auto_schedule.items():
+            row = self.twSummary.rowCount()
+            self.twSummary.insertRow(row)
+            select_item = QTableWidgetItem()
+            select_item.setFlags(select_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            select_item.setData(Qt.CheckStateRole, Qt.CheckState.Checked)
+            self.twSummary.setItem(row, 0, select_item)
+            self.twSummary.setItem(row, 1, QTableWidgetItem(date))
+            col = 2
+            for hour in hours:
+                oats_value = oats_schedule[date].get(hour, 0)
+                cell_value = f"{str(hours_count.get(hour, 0))},{oats_value}"
+
+                cell_widget = CellWidget(hours_count.get(hour, 0),
+                                         oats_schedule[date].get(hour, 0))
+                self.twSummary.setCellWidget(row, col, cell_widget)
+                col += 1
+
+            auto_total = sum(auto_schedule[date].values())
+            oats_total = sum(oats_schedule[date].values())
+            cell_widget = CellWidget(auto_total, oats_total)
+
+            cell_widget.left_button().setStyleSheet(self._total_button_style())
+            cell_widget.right_button().setStyleSheet(self._total_button_style())
+            
+            self.twSummary.setCellWidget(row, col, cell_widget)
+
+    def _total_button_style(self):
+         return "background-color: rgb(245, 255, 206); border-radius:1px; " \
+                    " min-width: 50px; min-height: 30px; font-weight: bold;"
 
     def on_run_check(self):
         self.validator_thread.start()
 
     def re_run_check(self):
-        gen_schedule = self.group_schedule_items_by_date(self.schedule_items, self.dates)
-        oats_sched = self.fetch_oats_schedule()
-        self.add_summary_items(gen_schedule, oats_sched)
+        gen_schedule = self.group_schedule_by_datetime(self.schedule_items, self.dates)
+        #oats_sched = self.fetch_oats_schedule()
+        self.schedule_validator.fetch_data()
+        oats_sched = self.schedule_validator.get_schedule()
+        self.add_summary_items(gen_schedule, oats_sched, self.current_template.hours())
 
     def on_create(self):
         if self.twSummary.rowCount() == 0:
@@ -224,6 +327,16 @@ class ScheduleSummaryDialog(widget, base):
                   if si.schedule_date() in dates]
         date_count = Counter(dates)
         return date_count
+
+    def group_schedule_by_datetime(self, schedule_items: list, dates: list) -> dict:
+        grouped_schedule = {}
+        for date in dates:
+            date_schedule_items = [si for si in schedule_items if si.schedule_date() == date]
+            time_items = [si.hour() for si in date_schedule_items]
+            time_count = Counter(time_items)
+            grouped_schedule[date.toString("yyyy-MM-dd")] = time_count
+        return grouped_schedule
+            
 
     def _make_insert_statements(self, dates: list, hours: list) -> dict:
         date_str = ', '.join([f"'{date}'" for date in dates])
@@ -424,8 +537,8 @@ class ScheduleSummaryDialog(widget, base):
             msg = f"Validation completed successfully: {message}"
             self.lblStatus.setText(msg)
             oats_sched = self.schedule_validator.get_schedule()
-            gen_schedule = self.group_schedule_items_by_date(self.schedule_items, self.dates)
-            self.add_summary_items(gen_schedule, oats_sched)
+            gen_schedule = self.group_schedule_by_datetime(self.schedule_items, self.dates)
+            self.add_summary_items(gen_schedule, oats_sched, self.current_template.hours())
         else:
             self.lblStatus.setText("Validation failed.")
 
