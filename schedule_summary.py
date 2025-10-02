@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QWidget,
     QPushButton,
-    QHBoxLayout
+    QHBoxLayout,
 )
 
 from PyQt5 import uic
@@ -15,7 +15,8 @@ from PyQt5 import uic
 from PyQt5.QtCore import (
     Qt,
     QThread,
-    QDate
+    QDate,
+    QDateTime
 )
 
 from mssql_data import MSSQLData
@@ -151,6 +152,7 @@ class ScheduleSummaryDialog(widget, base):
             columns.append(f"HR:{str(hour)}")
         columns.append("Total")
 
+        self.twSummary.clear()
         self.twSummary.setRowCount(0)
         self.twSummary.setColumnCount(len(columns))
         self.twSummary.setHorizontalHeaderLabels(columns)
@@ -173,6 +175,8 @@ class ScheduleSummaryDialog(widget, base):
     
     def add_summary_items(self, auto_schedule: dict, oats_schedule: dict, hours: list[int]):
         self._prepare_summary_table(self.current_template.hours())
+        if len(oats_schedule) == 0:
+            return
         for date, hours_count in auto_schedule.items():
             row = self.twSummary.rowCount()
             self.twSummary.insertRow(row)
@@ -208,10 +212,13 @@ class ScheduleSummaryDialog(widget, base):
         self.validator_thread.start()
 
     def re_run_check(self):
+        #self.validator_thread.start()
         gen_schedule = self.group_schedule_by_datetime(self.schedule_items, self.dates)
-        #oats_sched = self.fetch_oats_schedule()
+        # #oats_sched = self.fetch_oats_schedule()
+        self.schedule_validator.clear_schedule()
         self.schedule_validator.fetch_data()
         oats_sched = self.schedule_validator.get_schedule()
+        print("Re-running the check....")
         self.add_summary_items(gen_schedule, oats_sched, self.current_template.hours())
 
     def on_create(self):
@@ -227,8 +234,7 @@ class ScheduleSummaryDialog(widget, base):
         dates = []
         for row in range(self.twSummary.rowCount()):
             check_item = self.twSummary.item(row, 0)
-            oats_count = int(self.twSummary.item(row, 3).text())
-            if check_item.checkState() == Qt.CheckState.Checked and oats_count == 0:
+            if check_item.checkState() == Qt.CheckState.Checked:
                 date_item = self.twSummary.item(row, 1)
                 dates.append(date_item.text())
 
@@ -236,8 +242,16 @@ class ScheduleSummaryDialog(widget, base):
             self.show_message("No valid schedules selected for creation.")
             return False
 
+        current_datetime = QDateTime.currentDateTime().toString('dd-MM-yyyy HH:mm')
+        self.logger.log_info(f"Create Schedule. Start time: {current_datetime}")
+        self.logger.log_info(f"Create schedule for template: `{self.current_template.name()}`")
+        self.logger.log_info(f"Create schedule date range: {dates}")
+
         insert_stmts = self._make_insert_statements(dates, self.current_template.hours())
         self._execute_insert_statement(insert_stmts)
+
+        self.logger.log_info(f"Schedule creation completed successfully.")
+
         return True
 
     def on_delete_scheduled(self):
@@ -268,8 +282,16 @@ class ScheduleSummaryDialog(widget, base):
             self.show_message("No valid schedules selected for deletion.")
             return False
 
+        current_datetime = QDateTime.currentDateTime().toString('dd-MM-yyyy HH:mm')
+        self.logger.log_info(f"Delete Scheduled data only. Start time: {current_datetime}")
+        self.logger.log_info(f"Deleting schedule for template: `{self.current_template.name()}`")
+        self.logger.log_info(f"Delete date range: {dates}")
+
         delete_stmt = self._make_delete_stmt_for_scheduled_data(dates, self.current_template.hours())
         self._execute_delete_statement(delete_stmt)
+        
+        self.logger.log_info(f"Delete Scheduled data. End.")
+
         return True
 
     def on_delete_all(self):
@@ -286,6 +308,11 @@ class ScheduleSummaryDialog(widget, base):
         if len(dates) == 0:
             self.show_message("No valid schedules selected for deletion.")
             return False
+
+        current_datetime = QDateTime.currentDateTime().toString('dd-MM-yyyy HH:mm')
+        self.logger.log_info(f"Delete ALL. Start time: {current_datetime}")
+        self.logger.log_info(f"Deleting schedule for template: `{self.current_template.name()}`")
+        self.logger.log_info(f"Delete date range: {dates}")
 
         # Delete from MSSQL database
         delete_stmt = self._make_delete_stmt_for_scheduled_data(dates, self.current_template.hours())
@@ -318,6 +345,7 @@ class ScheduleSummaryDialog(widget, base):
         # Delete from local cache
         self.schedule_items = [si for si in self.schedule_items if si.schedule_date().toString("yyyy-MM-dd") not in dates]
         self.logger.log_info(f"Deleted all scheduled data from local cache successfully.")
+        self.logger.log_info(f"Delete all. End.")
 
         return True
 
@@ -510,6 +538,7 @@ class ScheduleSummaryDialog(widget, base):
         self.btnCreate.setEnabled(False)
         self.btnDelete.setEnabled(False)
         self.btnClose.setEnabled(False)
+        self.btnDeleteAll.setEnabled(False)
         self.lblStatus.setText("Validation started...")
 
         self.progressBar.setVisible(True)
@@ -524,6 +553,7 @@ class ScheduleSummaryDialog(widget, base):
         self.btnCreate.setEnabled(False)
         self.btnDelete.setEnabled(False)
         self.btnClose.setEnabled(False)
+        self.btnDeleteAll.setEnabled(False)
         self.lblStatus.setText("Update started...")
         self.lblStatus.repaint()
 
@@ -532,6 +562,7 @@ class ScheduleSummaryDialog(widget, base):
         self.btnCreate.setEnabled(True)
         self.btnDelete.setEnabled(True)
         self.btnClose.setEnabled(True)
+        self.btnDeleteAll.setEnabled(True)
         self.progressBar.setVisible(False)
         if success:
             msg = f"Validation completed successfully: {message}"

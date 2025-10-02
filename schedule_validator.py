@@ -86,6 +86,9 @@ class ScheduleValidator(QObject):
 
         return query
 
+    def clear_schedule(self):
+        self.schedule = {}
+
     def get_schedule(self):
         return self.schedule
 

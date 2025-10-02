@@ -54,7 +54,6 @@ class ScheduleUpdater(QObject):
         schedule_ref = self.get_schedule_ref()
         msg = f"Saving schedule reference: {schedule_ref}"
         self.update_progress.emit(0, msg)
-        self._log_info(msg)
 
         unique_hours_per_date = self.extract_unique_hours_per_date(self.schedule)
         
@@ -68,17 +67,13 @@ class ScheduleUpdater(QObject):
            sd = QDate.fromString(sched_date, "yyyy-MM-dd")
            sched_date_fmtd = sd.toString("dd-MM-yyyy")
 
-           msg = f"Saving schedule for date: {sched_date_fmtd}"
+           msg = f"Preparing schedulel to save for date: {sched_date_fmtd}"
            self.update_progress.emit(0, msg)
-           self._log_info(msg)
 
            count = 0
            for key, item in schedule_items.items():
 
                count += 1
-
-               msg = f"Processing schedule for date {sched_date_fmtd}. Record {count} of {len(schedule_items)}"
-               self.update_progress.emit(0, msg)
 
                if item.item_type() == ItemType.EMPTY:
                    continue
@@ -105,29 +100,33 @@ class ScheduleUpdater(QObject):
 
         msg = f"Creating data in Sedric database..."
         self.update_progress.emit(0, msg)
-        self._log_info(msg)
-        self._log_info(f"Total MSSQL statements to execute: {len(mssql_stmts)}")
+
+        msg = f"Total MSSQL statements to execute: {len(mssql_stmts)}"
+        self.update_progress.emit(0, msg)
 
         # MSSQL supports multiple statment execution
         mssql_all = "".join(mssql_stmts)
 
-        self._log_info("Executing MSSQL statements...")
+        msg = "Executing MSSQL statements..."
+        self.update_progress.emit(0, msg)
 
         status, msg = self.mssql_conn.execute_non_query(mssql_all)
 
         if not status:
             msg = f"Error creating schedule in Sedric database. {msg}"
             self.update_progress.emit(0, msg)
-            self._log_error(msg)
+            # self._log_error(msg)
             self.update_completed.emit(False)
             return
-        else:
-            self._log_info("MSSQL statements executed successfully.")
-
-        msg = f"Creating data schedule locally..."
+        
+        msg = "MSSQL statements executed successfully."
         self.update_progress.emit(0, msg)
-        self._log_info(msg)
-        self._log_info(f"Total SQLite statements to execute: {len(sqlite_stmts)}")  
+
+        msg = f"Creating schedule locally..."
+        self.update_progress.emit(0, msg)
+        #self._log_info(msg)
+        msg = f"Total SQLite statements to execute: {len(sqlite_stmts)}"  
+        self.update_progress.emit(0, msg)
 
         # SQLite supports single statement execution
         for stmt in sqlite_stmts:
@@ -135,7 +134,11 @@ class ScheduleUpdater(QObject):
 
         self.schedule_is_saved = True
 
-        self._log_info("Schedule saved successfully.")
+        msg = "Local schedule created successfully."
+        self.update_progress.emit(0, msg)
+
+        msg = "Schedule saved successfully."
+        self.update_progress.emit(0, msg)
 
         self.update_completed.emit(True)
 

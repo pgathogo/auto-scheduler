@@ -159,7 +159,7 @@ class ScheduleDialog(widget, base):
         self.lblStatusImg.setPixmap(pixmap)
 
     def status_saving(self):
-        self.lblStatus.setText("SAVING SCHEDULE...")
+        self.lblStatus.setText("SAVING SCHEDULE - Please wait...")
         pixmap = QPixmap("icons/warning_triangle.png")
         self.lblStatusImg.setPixmap(pixmap)
 
@@ -309,8 +309,11 @@ class ScheduleDialog(widget, base):
         self.tableWidget.setHorizontalHeaderLabels(["Time", "Title", "Artist", "Duration", "Actions"])
 
     def on_generate_schedule(self):
+        current_datetime = QDateTime.currentDateTime().toString('dd-MM-yyyy HH:mm')
+        self._log_info(f"Start schedule generation process at: {current_datetime}")
 
-        self._log_info("Generating schedule...")
+        msg = f"Generating schedule for template: `{self._template.name()}`..."
+        self._log_info(msg)
 
         self.clear_generated_schedule()
 
@@ -318,7 +321,13 @@ class ScheduleDialog(widget, base):
         dflt_start_date = start_date
         end_date = self.edtEndDate.date()
 
-        self._log_info(f"Generating schedule from {self._display_date_str(start_date)} to {self._display_date_str(end_date)}" )
+        self._log_info(f"Selected date range: from {self._display_date_str(start_date)} to {self._display_date_str(end_date)}" )
+
+        selected_hours = self._get_selected_hours()
+
+        log_hours = ', '.join(map(str, selected_hours))
+        msg = f"Selected hour(s): {log_hours}"
+        self._log_info(msg)
 
         dow = self._template.dow()
 
@@ -328,13 +337,18 @@ class ScheduleDialog(widget, base):
                 start_date = start_date.addDays(1)
                 continue
 
+            str_start_date = self._display_date_str(start_date)
+            self._log_info(f"Creating schedule for date: `{str_start_date}`")
+
+            self._log_info(f"Fetching commercaial breaks for date: {str_start_date}")
+
             comm_breaks = self.fetch_comm_break(start_date, self._template.hours())
+
+            self._log_info(f"Total commercial breaks found: {len(comm_breaks)}")
 
             comm_break_items = self._make_comm_break_items(comm_breaks)
 
             template_items = list(self._template.template_items().values())
-
-            selected_hours = self._get_selected_hours()
 
             # Remove empty, deleted, or items that don't match selected hours
             schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY 
@@ -350,7 +364,7 @@ class ScheduleDialog(widget, base):
             self._cache_generated_schedule(start_date, appended_list)
             self._add_date_to_table(start_date)
 
-            self._log_info(f"Schedule generated for {self._display_date_str(start_date)} - Items....: {len(processed_items)}")
+            self._log_info(f"Schedule generated for date: {self._display_date_str(start_date)}, Items generated: {len(processed_items)}")
             
             start_date = start_date.addDays(1)
 
@@ -612,7 +626,7 @@ class ScheduleDialog(widget, base):
                 item.set_start_time(None)
 
 
-    def fetch_comm_break(self, s_date, hrs: list):
+    def fetch_comm_break(self, s_date, hrs: list) ->list:
         # Fetch the commercial breaks from Traffik database
         dbconn = MSSQLData(MSSQL_CONN['server'], MSSQL_CONN['database'],
                        MSSQL_CONN['username'], MSSQL_CONN['password'])
@@ -638,8 +652,8 @@ class ScheduleDialog(widget, base):
             rows = dbconn.execute_query(sql)
             dbconn.disconnect()
             return rows
-        else:
-            return []
+
+        return []
 
     def _make_comm_break_items(self, comm_breaks):
         breaks = []
@@ -697,6 +711,10 @@ class ScheduleDialog(widget, base):
 
        self.schedule_status(SAVING)
 
+       current_datetime = QDateTime.currentDateTime().toString('dd-MM-yyyy HH:mm')
+       self._log_info(f"Saving procedure started. Time: {current_datetime}")
+       self._log_info(f"Saving schedule for template: `{self._template.name()}`")
+
        self.schedule_updater = ScheduleUpdater(self._daily_schedule, self._logger)
        self.schedule_updater.moveToThread(self.updater_thread)
 
@@ -748,6 +766,9 @@ class ScheduleDialog(widget, base):
             self.lblProgresText.setStyleSheet("color: red")
 
         self.lblProgresText.setText(msg)
+
+        self._log_info(msg)
+
         QCoreApplication.processEvents()
 
 
