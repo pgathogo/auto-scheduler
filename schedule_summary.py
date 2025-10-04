@@ -135,7 +135,6 @@ class ScheduleSummaryDialog(widget, base):
 
         self.setWindowTitle(f"Schedule Summary - {self.current_template.name()}")
 
-
     def showEvent(self, event):
         if self.run_immediately:
             self.on_run_check()
@@ -157,21 +156,6 @@ class ScheduleSummaryDialog(widget, base):
         self.twSummary.setColumnCount(len(columns))
         self.twSummary.setHorizontalHeaderLabels(columns)
         self.twSummary.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
-
-    def add_summary_itemsXX(self,auto_schedule: dict, oats_schedule:dict):
-        self._prepare_summary_table(self.current_template.hours())
-        for date, count in auto_schedule.items():
-            row = self.twSummary.rowCount()
-            self.twSummary.insertRow(row)
-            select_item = QTableWidgetItem()
-            select_item.setFlags(select_item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            select_item.setData(Qt.CheckStateRole, Qt.CheckState.Checked)
-            select_item.setTextAlignment(Qt.AlignCenter)
-
-            self.twSummary.setItem(row, 0, select_item)
-            self.twSummary.setItem(row, 1, QTableWidgetItem(date))
-            self.twSummary.setItem(row, 2, QTableWidgetItem(str(count)))
-            self.twSummary.setItem(row, 3, QTableWidgetItem(str(oats_schedule.get(date, 0))))
     
     def add_summary_items(self, auto_schedule: dict, oats_schedule: dict, hours: list[int]):
         self._prepare_summary_table(self.current_template.hours())
@@ -185,16 +169,18 @@ class ScheduleSummaryDialog(widget, base):
             select_item.setData(Qt.CheckStateRole, Qt.CheckState.Checked)
             self.twSummary.setItem(row, 0, select_item)
             self.twSummary.setItem(row, 1, QTableWidgetItem(date))
+            
             col = 2
             for hour in hours:
                 if date not in oats_schedule:
                     oats_schedule[date] = {}
-                # oats_value = oats_schedule[date].get(hour, 0)
-                # cell_value = f"{str(hours_count.get(hour, 0))},{oats_value}"
 
-                cell_widget = CellWidget(hours_count.get(hour, 0),
-                                         oats_schedule[date].get(hour, 0))
+                generated_count = hours_count.get(hour, 0)
+                oats_count = oats_schedule[date].get(hour, 0)
+
+                cell_widget = CellWidget(generated_count, oats_count)
                 self.twSummary.setCellWidget(row, col, cell_widget)
+
                 col += 1
 
             auto_total = sum(auto_schedule[date].values())

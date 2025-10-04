@@ -149,7 +149,7 @@ class TemplateConfiguration(widget, base):
 
         self.wigStats.hide()
         
-        self.spTemplate.setSizes([200, 800])
+        self.spTemplate.setSizes([400, 600])
         self.spMedia.setSizes([200, 800])
         self.spStats.setSizes([800, 200])
 
@@ -171,7 +171,6 @@ class TemplateConfiguration(widget, base):
         self.load_templates_from_db()
 
         self.template_stats = TemplateStatistics(self.twStats)   
-
 
 
     def _make_mssql_connection(self):
@@ -322,6 +321,10 @@ class TemplateConfiguration(widget, base):
         self.twTemplates.setRowCount(0)
         self.twTemplates.setColumnCount(3)
         self.twTemplates.setHorizontalHeaderLabels(["Name", "Hours", "DOW"])
+
+        self.twTemplates.setColumnWidth(0, 200)
+        self.twTemplates.setColumnWidth(1, 150)
+        self.twTemplates.setColumnWidth(2, 250)
         # self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def on_new_template(self):
