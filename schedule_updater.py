@@ -265,7 +265,7 @@ class ScheduleUpdater(QObject):
         return ins_stmt
 
     def _make_mssql_insert_statement(self, sched_date: str, schedule_ref: int, item, seq: int):
-        status = 'CUED'
+        status = ''
         item_source = 'SONG'
         comm_audio = 'AUDIO'
 
