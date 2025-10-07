@@ -325,6 +325,9 @@ class TemplateConfiguration(widget, base):
         self.twTemplates.setColumnWidth(0, 200)
         self.twTemplates.setColumnWidth(1, 150)
         self.twTemplates.setColumnWidth(2, 250)
+
+        self.twTemplates.setSortingEnabled(True)
+        # self.twTemplates.sortItems(0, Qt.SortOrder.AscendingOrder)
         # self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def on_new_template(self):
