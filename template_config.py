@@ -393,7 +393,8 @@ class TemplateConfiguration(widget, base):
 
 
     def load_templates_from_db(self):
-        self.templates = self.db_config.fetch_all_templates()
+        self.templates = self.mssql_conn.fetch_all_templates()
+        #self.templates = self.db_config.fetch_all_templates()
         self.show_templates(self.templates)
 
     def show_templates(self, templates: dict):
@@ -461,7 +462,8 @@ class TemplateConfiguration(widget, base):
 
     def on_save_template(self):
         # Add try catch 
-        self.db_config.save(self.templates)
+        #self.db_config.save(self.templates)
+        self.mssql_conn.save(self.templates)
 
     def on_search(self):
         if self.btnSearch.isChecked():
@@ -518,8 +520,6 @@ class TemplateConfiguration(widget, base):
             self.prepare_tracks_table()
             self.display_tracks(tracks)
 
-
-
     def on_delete_template(self):
         if len(self.twTemplates.selectionModel().selectedRows()) == 0:
             return
@@ -540,13 +540,10 @@ class TemplateConfiguration(widget, base):
             name = selected[0].text()
             template = self.templates[name]
             template.set_db_action(DBAction.DELETE)
-            #self.db_config.delete_template(template.id())
-            #del self.templates[name]
             self.twTemplates.removeRow(selected[0].row())
             twi = self.twTemplates.item(self.twTemplates.rowCount()-1, 0)
             self.twTemplates.setCurrentItem(twi, QItemSelectionModel.SelectCurrent)
             self._setup_items_table()
-            # self.show_templates(self.templates)
 
     def on_delete_template_item(self):
         selected = self.twItems.selectedItems()

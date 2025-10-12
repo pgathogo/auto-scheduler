@@ -785,7 +785,9 @@ class ScheduleDialog(widget, base):
         start_date = self.edtStartDate.date()
         end_date = self.edtEndDate.date()
         date_range = self._get_date_range(start_date, end_date)
-        scheduled_items = self.db_config.fetch_schedule_by_template_and_date_range(self._template.id(), 
+        # scheduled_items = self.db_config.fetch_schedule_by_template_and_date_range(self._template.id(), 
+        #                                                                            start_date, end_date)
+        scheduled_items = self.mssql_conn.fetch_schedule_by_template_and_date_range(self._template.id(), 
                                                                                    start_date, end_date)
         summary = ScheduleSummaryDialog(
             current_template=self._template, 

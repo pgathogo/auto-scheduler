@@ -30,6 +30,9 @@ from schedule import Schedule
 
 from track import Track
 
+from mssql_data import MSSQLData
+from data_types import MSSQL_CONN
+
 
 class DataConfiguration:
     def __init__(self, db_name: str):
@@ -505,11 +508,17 @@ class DataConfiguration:
 
         return schedule_items
 
+    def _make_mssql_connection(self):
+        server = MSSQL_CONN['server']
+        database = MSSQL_CONN['database']
+        username = MSSQL_CONN['username']  
+        password = MSSQL_CONN['password']
+        return MSSQLData(server, database, username, password)
 
     def fetch_schedule_by_template_and_date_range(self, template_id: int, start_date: QDate, end_date: QDate) -> list:
+        self.mssql_conn = self._make_mssql_connection()
+
         schedule_items = []
-        con = self._connect()
-        curs = con.cursor() 
 
         if end_date is None:
             date_filter = f" AND schedule_date >= '{start_date.toString('yyyy-MM-dd')}' "
@@ -526,9 +535,9 @@ class DataConfiguration:
                     f" AND duration > 0"
                     f" ORDER BY schedule_date"
                     )
-        curs.execute(sel_stmt)
 
-        rows = curs.fetchall()
+        print(sel_stmt)
+        rows = mssql_conn.execute_query(sel_stmt)
 
         for row in rows:
             schedule_item = self._make_schedule_item(row)
@@ -537,8 +546,6 @@ class DataConfiguration:
                 continue
 
             schedule_items.append(schedule_item)
-
-        con.close()
 
         return schedule_items
 

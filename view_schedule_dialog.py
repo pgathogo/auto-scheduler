@@ -30,6 +30,9 @@ from logging_handlers import (
     FileHandler
 )
 
+from mssql_data import MSSQLData
+from data_types import MSSQL_CONN
+
 widget, base = uic.loadUiType('view_schedule_dialog.ui')
 
 class ViewScheduleDialog(widget, base):
@@ -37,7 +40,8 @@ class ViewScheduleDialog(widget, base):
         super(ViewScheduleDialog, self).__init__()
         self.setupUi(self)
 
-        self.db_config = DataConfiguration("")
+        # self.db_config = DataConfiguration("")
+        self.mssql_conn = self._make_mssql_connection()
 
         self.edtFrom.setDate(QDate.currentDate())
         self.edtTo.setDate(QDate.currentDate())
@@ -68,6 +72,13 @@ class ViewScheduleDialog(widget, base):
         self.setWindowTitle("Schedule Viewer")
 
         self._logger = self._make_logger()
+
+    def _make_mssql_connection(self):
+        server = MSSQL_CONN['server']
+        database = MSSQL_CONN['database']
+        username = MSSQL_CONN['username']  
+        password = MSSQL_CONN['password']
+        return MSSQLData(server, database, username, password)
 
     def _make_logger(self):
         dtime = QDateTime.currentDateTime().toString('ddMMyyyy_HHmm')
@@ -172,7 +183,7 @@ class ViewScheduleDialog(widget, base):
         self.cbRange.addItem("Future")
 
     def _populate_template_list(self):
-        self.templates = self.db_config.fetch_all_templates()
+        self.templates = self.mssql_conn.fetch_all_templates()  #  self.db_config.fetch_all_templates()
         self._show_templates(self.templates)
 
     def _show_templates(self, templates: dict):
@@ -217,13 +228,14 @@ class ViewScheduleDialog(widget, base):
 
 
     def _load_schedule_by_date(self, date):
-        self.schedule_items = self.db_config.fetch_schedule_by_date(date)
+        print("-- db_config --")
+        #self.schedule_items = self.db_config.fetch_schedule_by_date(date)
 
         for item in self.schedule_items:
             self._add_schedule_item(item)
 
     def _load_schedule_by_template_and_date_range(self, template_id: int, start_date: QDate, end_date: QDate):
-        self.schedule_items = self.db_config.fetch_schedule_by_template_and_date_range(template_id, start_date, end_date)
+        self.schedule_items = self.mssql_conn.fetch_schedule_by_template_and_date_range(template_id, start_date, end_date)
         self._log_info(f"Loaded {len(self.schedule_items)} schedule items") 
 
         self._initilize_schedule_table()

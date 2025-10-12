@@ -320,15 +320,9 @@ class ScheduleSummaryDialog(widget, base):
         # Delete from SQLite database
 
         delete_stmt = self._make_delete_stmt_for_generated_data(dates, self.current_template.hours())
-        dc = DataConfiguration("")
 
-        self.logger.log_info(f"LOCAL:Deleting all data with statement: {delete_stmt}")
-        result = dc.execute_query(delete_stmt)
-        if not result:
-            log_msg = "Error deleting all scheduled data from local database."
-            self.show_message(log_msg)
-            self.logger.log_error(log_msg)
-            return False
+        self.logger.log_info(f"Deleting all data for AutoSchedule table statement: {delete_stmt}")
+        status, msg = self._execute_delete_statement(delete_stmt)
 
         # Delete from local cache
         self.schedule_items = [si for si in self.schedule_items if si.schedule_date().toString("yyyy-MM-dd") not in dates]
@@ -367,18 +361,20 @@ class ScheduleSummaryDialog(widget, base):
             'CUED' AS PlayStatus, 1 AS AutoTransition, 
             1 AS LiveTransition, 'SONG' AS ItemSource, 
             'AUDIO' AS ScheduleCommMediaType
-        FROM Schedule 
+        FROM AutoSchedule 
         WHERE schedule_date IN ({date_str})
         AND schedule_hour in  ({hour_str})
         AND duration > 0
         ORDER BY schedule_date, schedule_hour
         """
-        data_config = DataConfiguration("")
-        conn = data_config._connect()
-        curs = conn.cursor()
+        dbconn =  MSSQLData(
+            MSSQL_CONN['server'], 
+            MSSQL_CONN['database'], 
+            MSSQL_CONN['username'], 
+            MSSQL_CONN['password'])
 
-        curs.execute(query)
-        results = curs.fetchall()
+        results = dbconn.execute_query(query)
+
         insert_stmts = {}
 
         for result in results:
@@ -416,7 +412,7 @@ class ScheduleSummaryDialog(widget, base):
             else:
                 insert_stmts[ScheduleDate] = [insert_stmt]
 
-        conn.close()
+        # conn.close()
 
         return insert_stmts
 
@@ -438,7 +434,7 @@ class ScheduleSummaryDialog(widget, base):
         hour_str = ', '.join(map(str, hours))
 
         delete_stmt = f"""
-        DELETE FROM Schedule
+        DELETE FROM AutoSchedule
         WHERE schedule_date IN ({date_str})
           AND schedule_hour in  ({hour_str})
         """

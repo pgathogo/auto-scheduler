@@ -30,7 +30,7 @@ class ScheduleUpdater(QObject):
     def __init__(self, daily_schedule: dict, logger: EventLogger, parent=None):
         QObject.__init__(self, parent)
         self.schedule = daily_schedule
-        self.db_config = DataConfiguration("")
+        # self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
         self._logger = logger
 
@@ -49,9 +49,11 @@ class ScheduleUpdater(QObject):
 
         mssql_stmts  = []
         sqlite_stmts = []
+        sqlite_stmts.append("SET QUOTED_IDENTIFIER OFF;")
         logs = []
 
         schedule_ref = self.get_schedule_ref()
+
         msg = f"Saving schedule reference: {schedule_ref}"
         self.update_progress.emit(0, msg)
 
@@ -83,7 +85,7 @@ class ScheduleUpdater(QObject):
 
                if item.item_type() == ItemType.HEADER:
                    sqlite_seq += 1
-                   sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
+                   sqlite_schedule_record = self._make_auto_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
                    sqlite_stmts.append(sqlite_schedule_record)
                    continue
 
@@ -95,9 +97,12 @@ class ScheduleUpdater(QObject):
                mssql_stmts.append(mssql_schedule_insert_stmt)
 
                sqlite_seq += 1
-               sqlite_schedule_record = self._make_sqlite_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
+               sqlite_schedule_record = self._make_auto_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
+
                sqlite_stmts.append(sqlite_schedule_record)
 
+        sqlite_stmts.append("SET QUOTED_IDENTIFIER ON;")
+        
         msg = f"Creating data in Sedric database..."
         self.update_progress.emit(0, msg)
 
@@ -127,10 +132,13 @@ class ScheduleUpdater(QObject):
         #self._log_info(msg)
         msg = f"Total SQLite statements to execute: {len(sqlite_stmts)}"  
         self.update_progress.emit(0, msg)
+        
+        sqlite_all = "".join(sqlite_stmts)
 
-        # SQLite supports single statement execution
-        for stmt in sqlite_stmts:
-           self.db_config.execute_query(stmt)
+        status, msg = self.mssql_conn.execute_non_query(sqlite_all)
+
+        # for stmt in sqlite_stmts:
+        #    self.db_config.execute_query(stmt)
 
         self.schedule_is_saved = True
 
@@ -148,9 +156,17 @@ class ScheduleUpdater(QObject):
 
         while schedule_ref_found:
             schedule_ref = "".join(map(str, random.choices(range(1000), k=12)))[0:9]
-            schedule_ref_found = self.db_config.record_exists(
-                f"Select schedule_ref from schedule where schedule_ref = {schedule_ref};"
-            )
+
+            # schedule_ref_found = self.db_config.record_exists(
+            #     f"Select schedule_ref from schedule where schedule_ref = {schedule_ref};"
+            # )
+
+            sql_stmt = f"Select schedule_ref from AutoSchedule where schedule_ref = {schedule_ref};"
+            rows = self.mssql_conn.execute_query(sql_stmt)
+            if len(rows) == 0:
+                schedule_ref_found = False
+            else:
+                schedule_ref_found = True
 
         return int(schedule_ref)
 
@@ -179,7 +195,7 @@ class ScheduleUpdater(QObject):
 
         del_stmt_mssql = self._make_delete_statement_mssql(dates, unique_hours)
 
-        del_stmt_sqlite = self._make_delete_statement_sqlite(dates, unique_hours)
+        del_stmt_auto_schedule = self._make_delete_auto_schedule_statement(dates, unique_hours)
 
         # Execute statements
         status, msg =  self.mssql_conn.execute_non_query(del_stmt_mssql)
@@ -188,14 +204,19 @@ class ScheduleUpdater(QObject):
             self.update_progress.emit(0, msg)
             self._log_info(msg)
 
-            if not self.db_config.execute_query(del_stmt_sqlite):
+            #if not self.db_config.execute_query(del_stmt_sqlite):
+            status, msg =  self.mssql_conn.execute_non_query(del_stmt_auto_schedule)
+            if status:
+                msg = f"Deleted {len(unique_hours)} hours from dates {dates} in auto schdule table"
+                self.update_progress.emit(0, msg)
+                self._log_info(msg)
+            else:
                 msg = f"Error deleting {len(unique_hours)} hours from dates {dates} in local database"
                 self.update_progress.emit(0, msg)
                 self._log_error(msg)
                 return False
 
         return True
-
 
     def _get_schedule_ref(self, date: str, hrs: list) -> dict:
         # Fetch data from sqlite table schedule and retun a dict of
@@ -228,19 +249,20 @@ class ScheduleUpdater(QObject):
 
         del_stmt = (f"DELETE from Schedule "
                     f"WHERE ItemSource = 'SONG'"
-                    f" AND PlayStatus = 'CUED'"
+                    f" AND PlayStatus <> 'PLAYED'"
                     f" AND ScheduleDate in ({date_str})"
                     f" AND ScheduleHour in ({hours_str});")
         return del_stmt
 
-    def _make_delete_statement_sqlite(self, dates: list, hours: list) ->str:
+    def _make_delete_auto_schedule_statement(self, dates: list, hours: list) ->str:
         date_str = ",".join(f"'{d}'" for d in dates)
         hr_str = ",".join(str(h) for h in hours)
 
-        del_stmt = (f"DELETE from Schedule "
+        del_stmt = (f"DELETE from AutoSchedule "
                     f"WHERE schedule_date in ({date_str})"
                     f" AND Schedule_hour in ({hr_str});")
         return del_stmt
+
 
     def _make_mssql_connection(self):
         server = MSSQL_CONN['server']
@@ -249,10 +271,10 @@ class ScheduleUpdater(QObject):
         password = MSSQL_CONN['password']
         return MSSQLData(server, database, username, password)
 
-    def _make_sqlite_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
+    def _make_auto_schedule_record(self, sched_date: str, schedule_ref: int, item, seq: int):
         st = item.start_time().toString('HH:mm:ss')
 
-        ins_stmt = (f' Insert into schedule ( schedule_ref, schedule_date, template_id, start_time, '
+        ins_stmt = (f' Insert into AutoSchedule ( schedule_ref, schedule_date, template_id, start_time, '
                     f' schedule_hour, item_identifier, item_type, duration, title, artist_id, artist_name, '
                     f' folder_id, folder_name, track_id, filepath, item_row )'
                     f' VALUES ({schedule_ref}, "{sched_date}", {item.template_id()}, '
