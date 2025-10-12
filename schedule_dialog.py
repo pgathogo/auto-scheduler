@@ -81,7 +81,7 @@ class ScheduleDialog(widget, base):
         self._schedule_items = OrderedDict()
         self._daily_schedule = {}
 
-        self.db_config = DataConfiguration("")
+        # self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
 
         icon = QIcon('icons/generate.png')
@@ -691,9 +691,9 @@ class ScheduleDialog(widget, base):
 
         while schedule_ref_found:
             schedule_ref = "".join(map(str, random.choices(range(1000), k=12)))[0:9]
-            schedule_ref_found = self.db_config.record_exists(
-                f"Select schedule_ref from schedule where schedule_ref = {schedule_ref};"
-            )
+            # schedule_ref_found = self.db_config.record_exists(
+            #     f"Select schedule_ref from schedule where schedule_ref = {schedule_ref};"
+            # )
 
         return int(schedule_ref)
         

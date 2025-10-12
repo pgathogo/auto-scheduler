@@ -49,7 +49,7 @@ class ScheduleUpdater(QObject):
 
         mssql_stmts  = []
         sqlite_stmts = []
-        sqlite_stmts.append("SET QUOTED_IDENTIFIER OFF;")
+        # sqlite_stmts.append("SET QUOTED_IDENTIFIER OFF;")
         logs = []
 
         schedule_ref = self.get_schedule_ref()
@@ -69,7 +69,7 @@ class ScheduleUpdater(QObject):
            sd = QDate.fromString(sched_date, "yyyy-MM-dd")
            sched_date_fmtd = sd.toString("dd-MM-yyyy")
 
-           msg = f"Preparing schedulel to save for date: {sched_date_fmtd}"
+           msg = f"Preparing schedule to save for date: {sched_date_fmtd}"
            self.update_progress.emit(0, msg)
 
            count = 0
@@ -100,52 +100,64 @@ class ScheduleUpdater(QObject):
                sqlite_schedule_record = self._make_auto_schedule_record(sched_date, schedule_ref,  item, sqlite_seq)
 
                sqlite_stmts.append(sqlite_schedule_record)
-
-        sqlite_stmts.append("SET QUOTED_IDENTIFIER ON;")
         
-        msg = f"Creating data in Sedric database..."
+        msg = f"Creating schedule for Sedric database..."
         self.update_progress.emit(0, msg)
 
         msg = f"Total MSSQL statements to execute: {len(mssql_stmts)}"
         self.update_progress.emit(0, msg)
 
-        # MSSQL supports multiple statment execution
-        mssql_all = "".join(mssql_stmts)
+        # Chunk statements into groups of 30 
+        chunk_size = 30
+        mssql_stmts = [mssql_stmts[i:i + chunk_size] for i in range(0, len(mssql_stmts), chunk_size)]
 
-        msg = "Executing MSSQL statements..."
-        self.update_progress.emit(0, msg)
+        for i, chunk in enumerate(mssql_stmts):
+            mssql_all = "".join(chunk)
+            print(f"--- Executing chunk {i+1} of {len(mssql_stmts)} ---")
+            status, msg = self.mssql_conn.execute_non_query(mssql_all)
 
-        status, msg = self.mssql_conn.execute_non_query(mssql_all)
-
-        if not status:
-            msg = f"Error creating schedule in Sedric database. {msg}"
+            if not status:
+                msg = f"Error creating schedule in Sedric database. {msg}"
+                self.update_progress.emit(0, msg)
+                self._log_error(msg)
+                self.update_completed.emit(False)
+                return
+            
+            msg = f"Sedric chunk {i+1} of {len(mssql_stmts)} executed successfully."
             self.update_progress.emit(0, msg)
-            # self._log_error(msg)
-            self.update_completed.emit(False)
-            return
-        
-        msg = "MSSQL statements executed successfully."
-        self.update_progress.emit(0, msg)
 
-        msg = f"Creating schedule locally..."
+            time.sleep(0.5)  # Sleep for half a second to avoid overwhelming the server
+
+
+        msg = f"Creating auto-schedule..."
         self.update_progress.emit(0, msg)
-        #self._log_info(msg)
         msg = f"Total SQLite statements to execute: {len(sqlite_stmts)}"  
         self.update_progress.emit(0, msg)
         
-        sqlite_all = "".join(sqlite_stmts)
+        # Chunk statements into groups of 30 
+        auto_schedule_stmts = [sqlite_stmts[i:i + chunk_size] for i in range(0, len(sqlite_stmts), chunk_size)]
+        for i, chunk in enumerate(auto_schedule_stmts):
+            sqlite_all = "".join(chunk)
+            sqlite_all = f"SET QUOTED_IDENTIFIER OFF;\n{sqlite_all}\nSET QUOTED_IDENTIFIER ON;"
+            print(f"--- Executing chunk {i+1} of {len(auto_schedule_stmts)} ---")
+            status, msg = self.mssql_conn.execute_non_query(sqlite_all)
 
-        status, msg = self.mssql_conn.execute_non_query(sqlite_all)
+            if not status:
+                msg = f"Error creating auto-schedule. {msg}"
+                self.update_progress.emit(0, msg)
+                self._log_error(msg)
+                self.update_completed.emit(False)
+                return
+            
+            msg = f"Auto-Schedule chunk {i+1} of {len(auto_schedule_stmts)} executed successfully."
+            self.update_progress.emit(0, msg)
 
-        # for stmt in sqlite_stmts:
-        #    self.db_config.execute_query(stmt)
+            time.sleep(0.5)  # Sleep for half a second to avoid overwhelming the server 
 
-        self.schedule_is_saved = True
-
-        msg = "Local schedule created successfully."
+        msg = "Auto-schedule data created successfully."
         self.update_progress.emit(0, msg)
 
-        msg = "Schedule saved successfully."
+        msg = "Final schedule saved successfully."
         self.update_progress.emit(0, msg)
 
         self.update_completed.emit(True)
