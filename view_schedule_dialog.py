@@ -228,9 +228,6 @@ class ViewScheduleDialog(widget, base):
 
 
     def _load_schedule_by_date(self, date):
-        print("-- db_config --")
-        #self.schedule_items = self.db_config.fetch_schedule_by_date(date)
-
         for item in self.schedule_items:
             self._add_schedule_item(item)
 

@@ -95,7 +95,7 @@ class TemplateConfiguration(widget, base):
 
         self.folder_names = {}
 
-        self.db_config = DataConfiguration("")
+        # self.db_config = DataConfiguration("")
         self.mssql_conn = self._make_mssql_connection()
 
         self.set_template_table()
