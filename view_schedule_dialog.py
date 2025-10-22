@@ -219,11 +219,13 @@ class ViewScheduleDialog(widget, base):
 
             template_id = current.data(Qt.ItemDataRole.UserRole)
 
+            template = self.templates[template_name]
+
             if self.cbRange.currentIndex() == 0:
-                self._load_schedule_by_template_and_date_range(template_id,
+                self._load_schedule_by_template_and_date_range(template,
                                                             self.edtFrom.date(), self.edtTo.date())
             else:
-                self._load_schedule_by_template_and_date_range(template_id,
+                self._load_schedule_by_template_and_date_range(template,
                                                             self.edtFrom.date(), None)
 
 
@@ -231,14 +233,18 @@ class ViewScheduleDialog(widget, base):
         for item in self.schedule_items:
             self._add_schedule_item(item)
 
-    def _load_schedule_by_template_and_date_range(self, template_id: int, start_date: QDate, end_date: QDate):
-        self.schedule_items = self.mssql_conn.fetch_schedule_by_template_and_date_range(template_id, start_date, end_date)
+    def _load_schedule_by_template_and_date_range(self, template: 'Template', start_date: QDate, end_date: QDate):
+        self.schedule_items = self.mssql_conn.fetch_schedule_by_template_and_date_range(template.id(), start_date, end_date)
         self._log_info(f"Loaded {len(self.schedule_items)} schedule items") 
 
         self._initilize_schedule_table()
 
+        dow = template.dow()
+
         dates = []
         for item in self.schedule_items:
+            if item.schedule_date().dayOfWeek() not in dow:
+                continue
             added_item = self._add_schedule_item(item)
 
             if added_item:

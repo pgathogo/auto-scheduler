@@ -789,6 +789,10 @@ class ScheduleDialog(widget, base):
         #                                                                            start_date, end_date)
         scheduled_items = self.mssql_conn.fetch_schedule_by_template_and_date_range(self._template.id(), 
                                                                                    start_date, end_date)
+
+        # Remove dates in the date_range that are not in the template's DOW
+        date_range = [date for date in date_range if date.dayOfWeek() in self._template.dow()]
+
         summary = ScheduleSummaryDialog(
             current_template=self._template, 
             dates=date_range, 
