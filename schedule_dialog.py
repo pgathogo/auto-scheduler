@@ -390,9 +390,13 @@ class ScheduleDialog(widget, base):
         self._initialize_schedule_table()
 
         for key, item in items.items():
-            row = self.twSchedule.rowCount()
-            self.twSchedule.insertRow(row)
-            self._add_schedule_item(item, row)
+            #row = self.twSchedule.rowCount()
+            #self.twSchedule.insertRow(row)
+            #status = self._add_schedule_item(item, row)
+            status = self._add_schedule_item(item)
+            if not status:
+                #print(f"Failed to add schedule item: {item.title()} Time {item.start_time()}")
+                self._log_error(f"Failed to add schedule item: {item.title()} Time {item.start_time()}")
 
     def _cache_generated_schedule(self, sched_date: QDate, items: list):
         schedule_items = OrderedDict()
@@ -500,7 +504,8 @@ class ScheduleDialog(widget, base):
                 
                 mixed_items.sort(key=lambda x: x.start_time())
 
-                self._compute_hourly_start_times(mixed_items)
+                #self._compute_hourly_start_times(mixed_items)
+                self._clip_overflow_times(mixed_items)
                 clean_items = [item for item in mixed_items if item.start_time() != None ]
 
                 #mixed_items.insert(0, header_item)
@@ -543,15 +548,17 @@ class ScheduleDialog(widget, base):
             schedule_items.insert(cb['slot'], cb['comm_break'])
     
 
-    def _add_schedule_item(self, s_item, row):
-
+    def _add_schedule_item(self, s_item) ->bool:
         item = s_item
 
         if item.start_time() is None:
-            return
+            return False
 
         if s_item.item_type() not in BaseTableWidgetItem.widget_register:
-            return
+            return False
+
+        row = self.twSchedule.rowCount()
+        self.twSchedule.insertRow(row)
 
         WidgetItem = BaseTableWidgetItem.widget_register[item.item_type()]
 
@@ -571,6 +578,7 @@ class ScheduleDialog(widget, base):
             self.twSchedule.setItem(row, 5, WidgetItem(item.formatted_track_id()))
             
         self.twSchedule.setItem(row, 6, WidgetItem(item.item_path()))
+        return True
 
 
     def _compute_start_times(self):
@@ -606,6 +614,15 @@ class ScheduleDialog(widget, base):
             prev_start_time = start_time
             prev_dur = item.duration()
 
+    def _clip_overflow_times(self, schedule_items: list):
+        hr = -1
+        for idx, item in enumerate(schedule_items):
+            if hr != item.hour():
+                hr = item.hour()
+            if item.start_time().hour() > hr:   
+                item.set_start_time(None)
+
+                
     def _compute_hourly_start_times(self, schedule_items: list):
         prev_start_time = None
         hr = -1
@@ -620,9 +637,12 @@ class ScheduleDialog(widget, base):
                 if prev_item.start_time() != None:
                     prev_start_time = prev_item.start_time().addMSecs(prev_item.duration())
                     item.set_start_time(prev_start_time)
+                # else:
+                #     item.set_start_time(None)
+                #     continue
 
             # Check and clip items that exceed their hour
-            if item.start_time().hour() > item.hour():
+            if item.start_time().hour() > hr:   #item.hour():
                 item.set_start_time(None)
 
 

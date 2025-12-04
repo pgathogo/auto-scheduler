@@ -218,7 +218,15 @@ class TemplateConfiguration(widget, base):
         self.twItems.setRowHeight(7, 10)
 
         self.twItems.setHorizontalHeaderLabels(["Start", "Length", "Title", "Artist", "Category", "Filename", "Path", "Rotation"])
-        self.twItems.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        #self.twItems.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.twItems.setColumnWidth(0, 80)
+        self.twItems.setColumnWidth(1, 80)
+        self.twItems.setColumnWidth(2, 200)
+        self.twItems.setColumnWidth(3, 200)
+        self.twItems.setColumnWidth(4, 200)
+        self.twItems.setColumnWidth(5, 200)
+        self.twItems.setColumnWidth(6, 300)
+        self.twItems.setColumnWidth(7, 100)
     
     def _populate_items_table(self, template_items: dict):
         for key, item in template_items.items():
