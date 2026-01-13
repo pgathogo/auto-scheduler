@@ -31,6 +31,7 @@ class TemplateColumns(IntEnum):
     DESC = 2
     HOURS = 3
     DOW = 4
+    FILLER_FOLDER = 5
 
 class TemplateItemColumns(IntEnum):
     ID = 0

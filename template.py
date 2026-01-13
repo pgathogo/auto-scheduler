@@ -11,6 +11,7 @@ class Template:
         self._dow = []
         self._template_items = OrderedDict()
         self._db_action = DBAction.NONE
+        self._filler_folder = -1
 
     def id(self):
         return self._id
@@ -86,6 +87,14 @@ class Template:
     def set_db_action(self, action: DBAction):
         self._db_action = action
 
+    def filler_folder(self) -> int:
+        return self._filler_folder
+
+    def set_filler_folder(self, folder_id: int):
+        if folder_id is None:
+            folder_id = -1
+        self._filler_folder = folder_id
+
     def get_items_for_hour(self, hour)->list:
         items = [item for item in self._template_items.values() if item.hour() == hour]
         return items
@@ -96,5 +105,6 @@ class Template:
                 item.set_db_action(DBAction.DELETE)
 
     def template_items_by_hour(self, hour:int) -> list:
-        items = [item for item in self._template_items.values() if item.hour() == hour]
+        items = [item for item in self._template_items.values() if item.hour() == hour
+                  and item.db_action() != DBAction.DELETE]
         return items

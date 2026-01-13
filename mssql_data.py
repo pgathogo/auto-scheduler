@@ -113,7 +113,7 @@ class MSSQLData:
     def fetch_all_templates(self) ->dict:
         templates = {}
 
-        sel_stmt = f"Select id, name, description, hours, dow From templateheader;"
+        sel_stmt = f"Select id, name, description, hours, dow, filler_folder From templateheader;"
         rows = self.execute_query(sel_stmt)
 
         if rows is None:
@@ -197,12 +197,15 @@ class MSSQLData:
         hours_str = db_record[(TemplateColumns.HOURS)]
         dow_str = db_record[(TemplateColumns.DOW)]
 
+        filler_folder = db_record[(TemplateColumns.FILLER_FOLDER)]
+
         template = Template(name)
 
         template.set_id(id)
         template.set_name(name)
         template.set_description(desc)
         template.set_db_action(DBAction.NONE)
+        template.set_filler_folder(filler_folder)
             
         hours = [int(h) for h in hours_str.split(',')]
         template.set_hours(hours)
@@ -414,10 +417,11 @@ class MSSQLData:
     def _create_template(self, template) -> int:
         hours = ",".join([str(i) for i in template.hours()])
         dow = ",".join([str(i) for i in template.dow()])
-        
-        ins_stmt = (f"Insert into TemplateHeader (name, description, hours, dow) " 
+        filler_folder = template.filler_folder()
+
+        ins_stmt = (f"Insert into TemplateHeader (name, description, hours, dow, filler_folder) " 
                     f"OUTPUT INSERTED.id "
-                    f" Values ('{template.name()}','{template.description()}','{hours}', '{dow}')"
+                    f" Values ('{template.name()}','{template.description()}','{hours}', '{dow}', {filler_folder})"
                     )
 
         print(f'Creating template {template.name()}...')
@@ -431,7 +435,7 @@ class MSSQLData:
         dow = ",".join([str(i) for i in template.dow()])
 
         upd_stmt = (f"Update TemplateHeader set name='{template.name()}', "
-                    f" description='{template.description()}', hours='{hours}', dow='{dow}' "
+                    f" description='{template.description()}', hours='{hours}', dow='{dow}', filler_folder={template.filler_folder()} "
                     f" Where id={template.id()};"
                     )
 

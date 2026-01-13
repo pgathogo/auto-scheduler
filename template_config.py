@@ -339,7 +339,7 @@ class TemplateConfiguration(widget, base):
         # self.twTemplates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     def on_new_template(self):
-        dialog = TemplateDialog()
+        dialog = TemplateDialog(None, self.twMedia)
         result = dialog.exec_()
 
         if result == QDialog.Accepted:
@@ -362,7 +362,8 @@ class TemplateConfiguration(widget, base):
     def on_edit(self):
         if len(self.twTemplates.selectionModel().selectedRows()) == 0:
             return
-        dialog = TemplateDialog(self.current_template)
+
+        dialog = TemplateDialog(self.current_template, self.twMedia)
         result = dialog.exec_()
 
         if result == QDialog.Accepted:
@@ -386,6 +387,7 @@ class TemplateConfiguration(widget, base):
                     header_and_blank = self.create_hourly_headers([hour])
                     self.templates[self.current_template.name()].insert_header(header_and_blank)
 
+            self.templates[self.current_template.name()].set_filler_folder(dialog.get_filler_folder())
             self.templates[self.current_template.name()].set_hours(updated_hours)
             self.templates[self.current_template.name()].set_db_action(DBAction.UPDATE)
 
@@ -399,10 +401,8 @@ class TemplateConfiguration(widget, base):
         else:
             self.wigStats.hide()
 
-
     def load_templates_from_db(self):
         self.templates = self.mssql_conn.fetch_all_templates()
-        #self.templates = self.db_config.fetch_all_templates()
         self.show_templates(self.templates)
 
     def show_templates(self, templates: dict):
@@ -565,8 +565,9 @@ class TemplateConfiguration(widget, base):
             self.current_template.item(item_identifier).set_db_action(DBAction.DELETE)
             # self.current_template.remove_item(item_id)
             self.twItems.removeRow(selected[0].row())
-
             self.compute_start_times()
+            self.template_stats.compute_stats(self.current_template)
+
 
     def create_media_folders(self):
         #records = self.read_tree_from_file('data/tree.txt')
@@ -611,7 +612,6 @@ class TemplateConfiguration(widget, base):
                 item = QTreeWidgetItem([node_name])
 
                 self.folder_names[node.node_id] = node_name
-
 
                 #item = QTreeWidgetItem([node.name])
                 item.setData(0, Qt.ItemDataRole.UserRole, node.node_id)
@@ -712,8 +712,6 @@ class TemplateConfiguration(widget, base):
 
             new_item = FolderItem(self.current_folder['name'])
 
-            #new_item = FolderItem(self.twMedia.currentItem().text(0))
-
             new_item.set_duration(self.current_folder['avg_duration'])
             new_item.set_folder_id(self.current_folder['id'])
             new_item.set_folder_name(self.current_folder['name'])
@@ -774,7 +772,8 @@ class TemplateConfiguration(widget, base):
 
         self.compute_start_times()
 
-        self.template_stats.update_stats(hour, self.current_template)
+        #self.template_stats.update_stats(hour, self.current_template)
+        self.template_stats.compute_stats(self.current_template)
 
 
     def add_item_to_table(self, row: int, item: "TemplateItem"):
@@ -835,9 +834,11 @@ class TemplateConfiguration(widget, base):
     def on_create_schedule(self):
         if len(self.twTemplates.selectionModel().selectedRows()) == 0:
             return
+
         if self.current_template is None:
             return
-        schedule_dlg = ScheduleDialog(self.current_template, self.tracks)
+
+        schedule_dlg = ScheduleDialog(self.current_template, self.tracks, self.folder_names)
         self.main_window.mdi_area.addSubWindow(schedule_dlg)
         schedule_dlg.showMaximized()
 
@@ -861,7 +862,7 @@ class TemplateConfiguration(widget, base):
                    f" where ArtistID_1 is not Null"
                      f" AND FolderID > 0 "
                      f" AND TrackDeleted = 0 "
-                   f" order by TrackReference ")
+                   f" order by Folderid, TrackReference ")
 
             rows = mssql.execute_query(sql)
             for row in rows:

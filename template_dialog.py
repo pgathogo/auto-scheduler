@@ -9,16 +9,19 @@ from PyQt5.QtCore import (
     Qt
 )
 
+from tree_combo import TreeComboBox
+
 widget, base = uic.loadUiType('template_dialog.ui')
 
 class TemplateDialog(widget, base):
-    def __init__(self, template=None):
+    def __init__(self, template=None, tree_widget=None):
         super(TemplateDialog, self).__init__()
         self.setupUi(self)
         self._template = template
 
         self.selected_hours = []
         self.selected_dow = []
+        self._filler_folder_id = -1
 
         self.btnOk.clicked.connect(self.accept)
         self.btnCancel.clicked.connect(self.reject)
@@ -27,7 +30,24 @@ class TemplateDialog(widget, base):
         self._check_uncheck_dow(Qt.CheckState.Checked)
 
         self._initialize_values(self._template)
+
+        self.tree_combo = TreeComboBox(self)
+        self.glMain.addWidget(self.tree_combo, 3, 1)
+        self.tree_combo.populate_from_tree_widget(tree_widget)
+        self.tree_combo.tree_view.expandAll()
+
+        self.tree_combo.editTextChanged.connect(self.on_tree_combo_text_changed)
+
+        if self._template is not None:
+            index = self.tree_combo.get_index_with_data(self._template.filler_folder())
+            if index is not None:
+                self.tree_combo.on_item_clicked(index)
         
+    def on_tree_combo_text_changed(self, text):
+        data = self.tree_combo.get_data_with_text(text)
+        if data is not None:
+            self._filler_folder_id = data
+
     def _initialize_values(self, template):
         if template is not None:
             self.txtName.setText(template.name())
@@ -48,6 +68,9 @@ class TemplateDialog(widget, base):
 
     def get_dow(self) ->list:
         return self.selected_dow
+
+    def get_filler_folder(self) -> int:
+        return self._filler_folder_id
 
     def populate_hours(self):
         # Populate the list of hours using the range 0-23 of QListWidgetItems formatted as 00:00 - 23:00

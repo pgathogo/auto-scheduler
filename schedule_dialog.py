@@ -35,6 +35,7 @@ from PyQt5.QtGui import (
 from template import Template
 from mssql_data import MSSQLData
 
+
 from data_types import (
     MSSQL_CONN,
     ItemType,
@@ -45,7 +46,8 @@ from data_types import (
 from template_item import (
     CommercialBreakItem,
     BaseTableWidgetItem,
-    SongItem
+    SongItem,
+    FolderItem
 )
 
 from data_config import DataConfiguration
@@ -68,7 +70,7 @@ SAVING = 2
 SAVED = 3
 
 class ScheduleDialog(widget, base):
-    def __init__(self, template: Template, tracks: OrderedDict):
+    def __init__(self, template: Template, tracks: OrderedDict, folders: dict):
         super(ScheduleDialog, self).__init__()
         self.setupUi(self)
 
@@ -77,6 +79,8 @@ class ScheduleDialog(widget, base):
         self._folder_tracks = {}
         self.selected_date_str = ""
         self.schedule_is_saved = False
+
+        self._folders = folders
 
         self._schedule_items = OrderedDict()
         self._daily_schedule = {}
@@ -107,7 +111,7 @@ class ScheduleDialog(widget, base):
         self._initialize_dates_table()
         self.spVert.setSizes([300, 700])
 
-        self.setWindowTitle(f"Template: {self._template.name()} - Days of Week: {self.dow_text(self._template.dow())}")
+        self.setWindowTitle(f"Create Schedule for Template: {self._template.name()} - Days of Week: {self.dow_text(self._template.dow())}")
 
         self.lblProgresText.setVisible(False)
 
@@ -210,12 +214,11 @@ class ScheduleDialog(widget, base):
     def _initialize_dates_table(self):
         self.twDates.clear()
         self.twDates.setRowCount(0)
-        self.twDates.setColumnCount(2)
+        self.twDates.setColumnCount(1)
         self.twDates.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.twDates.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
         self.twDates.setColumnWidth(0, 200)
-        self.twDates.setColumnWidth(1, 200)
-        self.twDates.setHorizontalHeaderLabels(["Date", "Hours"])
+        self.twDates.setHorizontalHeaderLabels(["Date"])
 
     def _add_date_to_table(self, date:QDate):
         row = self.twDates.rowCount()
@@ -225,9 +228,6 @@ class ScheduleDialog(widget, base):
         date_item.setData(Qt.ItemDataRole.UserRole, self._db_date_str(date))
 
         self.twDates.setItem(row, 0, date_item)
-
-        hour_widget = QComboBox(self)
-        self.twDates.setCellWidget(row, 1, hour_widget)
 
     def on_date_clicked(self, item: QTableWidgetItem):
         date_text = item.data(Qt.ItemDataRole.UserRole)
@@ -239,6 +239,7 @@ class ScheduleDialog(widget, base):
         self._populate_schedule_table(filtered_items)
 
         self.selected_date_str = date_text
+        self.compute_total_time_per_hour(date_text)
 
     def _display_date_str(self, date: QDate=None)-> str:
         # Return date as string of DD-MM-YYYY format for display
@@ -257,41 +258,70 @@ class ScheduleDialog(widget, base):
         self.edtEndDate.setDate(QDate.currentDate())
 
         self.show_template_time_range(self._template.hours())
-        self.lwHours.itemClicked.connect(self.on_hour_clicked)
+        self.twHours.itemClicked.connect(self.on_hour_clicked)
+
+    def show_template_time_range(self, hours: list):
+        # Add column headers
+        self.twHours.clear()
+        self.twHours.setRowCount(0)
+        self.twHours.setColumnCount(2)
+        self.twHours.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
+        self.twHours.setHorizontalHeaderLabels(["Hour", "Total Time"])
+        self.twHours.itemChanged.connect(self.on_hour_clicked)
+
+        # Add items to the QListWidget for each hour in the list
+        for hour in hours:
+            row = self.twHours.rowCount()
+            self.twHours.insertRow(row)
+
+            item = QTableWidgetItem(f"{hour:02d}:00")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
+            item.setData(Qt.ItemDataRole.UserRole, hour)
+            self.twHours.setItem(row, 0, item)
+
+            # Column for total time
+            item = QTableWidgetItem("00:00:00")
+            self.twHours.setItem(row, 1, item)
 
     
-    def show_template_time_range(self, hours: list):
+    def show_template_time_range2(self, hours: list):
         # Add items to the QListWidget for each hour in the list
         for hour in hours:
             item = QListWidgetItem(f"{hour:02d}:00")
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Checked)
             item.setData(Qt.ItemDataRole.UserRole, hour)
-            self.lwHours.addItem(item)
+            #self.lwHours.addItem(item)
 
     def on_state_changed(self, state: int):
         # Check if the checkbox is checked or unchecked
         if state == Qt.CheckState.Checked:
             # Checkbox is checked, show all hours
-            for i in range(self.lwHours.count()):
-                item = self.lwHours.item(i)
+            for i in range(self.twHours.rowCount()):
+                item = self.twHours.item(i, 0)
                 item.setCheckState(Qt.CheckState.Checked)
         else:
             # Checkbox is unchecked, hide all hours
-            for i in range(self.lwHours.count()):
-                item = self.lwHours.item(i)
+            for i in range(self.twHours.rowCount()):
+                item = self.twHours.item(i, 0)
                 item.setCheckState(Qt.CheckState.Unchecked)
         self.on_hour_clicked(None)
 
-    def on_hour_clicked(self, item: QListWidgetItem):
+    def on_hour_clicked(self, item: QTableWidgetItem):
         selected_hours = self._get_selected_hours()
         self._show_selected_hours(selected_hours)
+        if item is not None:
+            if item.checkState() == Qt.CheckState.Checked:
+                self.twHours.selectRow(item.row())
+            else:
+                self.twHours.clearSelection()
 
     def _get_selected_hours(self) ->list[int]:
         selected_hours = []
         # Selected hours are the items that are checked
-        for i in range(self.lwHours.count()):
-            item = self.lwHours.item(i)
+        for row in range(self.twHours.rowCount()):
+            item = self.twHours.item(row, 0)
             if item.checkState() == Qt.CheckState.Checked:
                 selected_hours.append(item.data(Qt.ItemDataRole.UserRole))
         return selected_hours
@@ -333,8 +363,11 @@ class ScheduleDialog(widget, base):
 
         while start_date <= end_date:
 
+            self._log_info(f"Processing date: {self._display_date_str(start_date)}")
+
             if start_date.dayOfWeek() not in dow:
                 start_date = start_date.addDays(1)
+                self._log_info(f"Skipping date {self._display_date_str(start_date)} as it is not in template day of week.")
                 continue
 
             str_start_date = self._display_date_str(start_date)
@@ -342,30 +375,14 @@ class ScheduleDialog(widget, base):
 
             self._log_info(f"Fetching commercaial breaks for date: {str_start_date}")
 
-            comm_breaks = self.fetch_comm_break(start_date, self._template.hours())
+            for hr in self._template.hours():
+                generated_list = self._generate_schedule_for_hour(start_date, hr)
 
-            self._log_info(f"Total commercial breaks found: {len(comm_breaks)}")
+                self._cache_generated_schedule(start_date, generated_list)
 
-            comm_break_items = self._make_comm_break_items(comm_breaks)
-
-            template_items = list(self._template.template_items().values())
-
-            # Remove empty, deleted, or items that don't match selected hours
-            schedule_items = [item for item in template_items if item.item_type() != ItemType.EMPTY 
-                              and item.db_action() != DBAction.DELETE and item.hour() in selected_hours]
-
-            # Maintain the order of items in the template based on how they were inserted
-            schedule_items.sort(key=lambda item: item.item_row())
-
-            processed_items = self._convert_category_to_track(schedule_items,self._template.id())
-
-            appended_list = self._append_comm_breaks(comm_break_items, processed_items)
-
-            self._cache_generated_schedule(start_date, appended_list)
+                self._log_info(f"Schedule generated for date: {self._display_date_str(start_date)} Hour {hr}, Items generated: {len(generated_list)}")
+                
             self._add_date_to_table(start_date)
-
-            self._log_info(f"Schedule generated for date: {self._display_date_str(start_date)}, Items generated: {len(processed_items)}")
-            
             start_date = start_date.addDays(1)
 
         sdate = self._db_date_str(dflt_start_date)
@@ -377,6 +394,12 @@ class ScheduleDialog(widget, base):
 
         self.selected_date_str = sdate
 
+        if len(self._daily_schedule) > 0:
+            # Click the first date by default
+            first_date_item = self.twDates.item(0, 0)
+            self.twDates.setCurrentItem(first_date_item)
+            self.on_date_clicked(first_date_item)
+
         self.schedule_status(GENERATED)
 
     def clear_generated_schedule(self):
@@ -384,18 +407,35 @@ class ScheduleDialog(widget, base):
         self._initialize_schedule_table()
         self._initialize_dates_table()
         self._setup_table_widget()
-
         
+    def compute_total_time_per_hour(self, date_str: str):
+        hour_totals = {hour: 0 for hour in self._template.hours()}
+
+        date_schedule = self._daily_schedule.get(date_str, {})
+        if not date_schedule:
+            return
+
+        for key, item in date_schedule.items():
+            hour = item.hour()
+            hour_totals[hour] += item.duration()
+
+        for row in range(self.twHours.rowCount()):
+            item = self.twHours.item(row, 0)
+            hour = item.data(Qt.ItemDataRole.UserRole)
+            total_duration = hour_totals.get(hour, 0)
+
+            time = QTime(hour, 0, 0)
+            time_duration = time.addMSecs(total_duration).toString("hh:mm:ss")
+
+            total_item = self.twHours.item(row, 1)
+            total_item.setText(time_duration)
+
     def _populate_schedule_table(self, items: dict):
         self._initialize_schedule_table()
 
         for key, item in items.items():
-            #row = self.twSchedule.rowCount()
-            #self.twSchedule.insertRow(row)
-            #status = self._add_schedule_item(item, row)
             status = self._add_schedule_item(item)
             if not status:
-                #print(f"Failed to add schedule item: {item.title()} Time {item.start_time()}")
                 self._log_error(f"Failed to add schedule item: {item.title()} Time {item.start_time()}")
 
     def _cache_generated_schedule(self, sched_date: QDate, items: list):
@@ -403,9 +443,12 @@ class ScheduleDialog(widget, base):
         for item in items:
             schedule_items[item.item_identifier()] = item
 
-        self._daily_schedule[self._db_date_str(sched_date)] = schedule_items
+        if self._db_date_str(sched_date) not in self._daily_schedule:
+            self._daily_schedule[self._db_date_str(sched_date)] = schedule_items
+        else:
+            self._daily_schedule[self._db_date_str(sched_date)].update(schedule_items)
 
-    def _pick_a_random_track(self, folder_id):
+    def _pick_a_random_track(self, folder_id) -> "Track":
         if folder_id not in self._tracks:
             return None
         tracks = self._tracks[folder_id]
@@ -440,6 +483,7 @@ class ScheduleDialog(widget, base):
 
     def _convert_category_to_track(self, schedule_items, template_id: int) -> list:
         s_items = []
+
         for item in schedule_items:
 
             if item.item_type() != ItemType.FOLDER:
@@ -466,18 +510,172 @@ class ScheduleDialog(widget, base):
 
         return s_items
 
+    def _generate_schedule_for_hour(self, sched_date: QDate, hour: int) -> list:
+        self._log_info(f"Generate schedule for hour: {hour:02d}:00")
+
+        comm_breaks = self.fetch_comm_break(sched_date, hour)
+
+        self._log_info(f"Total commercial breaks found for hour {hour} - {len(comm_breaks)}")
+
+        comm_break_items = self._make_comm_break_items(comm_breaks)
+
+        schedule_items = [item for item in self._template.template_items().values() if item.item_type() != ItemType.EMPTY
+                            and item.db_action() != DBAction.DELETE and item.hour() == hour]
+
+        # Maintain the order of items in the template based on how they were inserted
+        schedule_items.sort(key=lambda item: item.item_row())
+
+        processed_items = self._convert_category_to_track(schedule_items,self._template.id())
+
+        appended_list = self._append_comm_breaks(comm_break_items, processed_items)
+
+        self._compute_st(appended_list)
+
+        ONE_HOUR_MS = 3600000
+
+        total_duration = sum([item.duration() for item in appended_list if item.hour() == hour])
+        if total_duration > ONE_HOUR_MS:
+            self._generate_schedule_for_hour(sched_date, hour)
+
+        appended_list = self._tight_fit_hour(hour, appended_list)
+
+        self._compute_st(appended_list)
+
+        # Compute total duration of the appended_list so far
+        total_duration = sum([item.duration() for item in appended_list if item.hour() == hour])
+        total_time = QTime(hour, 0, 0).addMSecs(total_duration).toString("hh:mm:ss")
+
+        if total_duration > ONE_HOUR_MS:
+            msg = f"Total duration for hour {hour} exceeds 1 hour: {total_duration} ms. Retrying generation..."
+            self._log_error(msg)
+            # Recursively call to regenerate the hour
+            appended_list = self._generate_schedule_for_hour(sched_date, hour)
+
+        return appended_list
+
+
+    def _tight_fit_hour(self, hr: int, schedule_items: list) -> list:
+        # Get folder categories from the current template
+        folder_items = [item for item in self._template.template_items().values() if item.item_type() == ItemType.FOLDER]
+
+        # Pick a random folder item
+        if len(folder_items) == 0:
+            return []
+        
+        # We get the total duration of items in the hour
+        hour_total_duration = 0
+        ONE_HOUR_MS = 3600000
+
+        for item in schedule_items:
+           hour_total_duration += item.duration()
+
+        if hour_total_duration >= ONE_HOUR_MS:
+            return schedule_items
+
+        htd = QTime(hr, 0, 0).addMSecs(hour_total_duration).toString("hh:mm:ss")
+
+        last_start_time = schedule_items[-1].start_time()
+        last_start_time = last_start_time.addMSecs(schedule_items[-1].duration())
+
+        existing_track_ids = [item.track_id() for item in schedule_items]
+
+        folder_search_index = 0
+        SMALL_DURATION_MS = 30000  # 30 seconds
+
+        # If total duration is less than 3600000 ms (1 hour), we need to fill the hour
+        while hour_total_duration < ONE_HOUR_MS:
+            folder_item = random.choice(folder_items)
+
+            diff_duration = ONE_HOUR_MS - hour_total_duration
+
+            if diff_duration <= SMALL_DURATION_MS and self._template.filler_folder() != -1:
+                # Look for small track in filler folder
+                track = self._find_track_within_duration(self._template.filler_folder(), diff_duration, existing_track_ids)
+                if track is None:
+                    break
+
+                # Find folder from folder_items with ID of filler folder
+                folder_item = FolderItem(self._folders[self._template.filler_folder()])
+                folder_item.set_folder_id(self._template.filler_folder())
+                folder_item.set_folder_name(self._folders[self._template.filler_folder()])
+                folder_item.set_hour(hr)
+            else:
+                track = self._find_track_within_duration(folder_item.folder_id(), diff_duration, existing_track_ids)
+
+            if track is None:
+                folder_search_index += 1
+                if folder_search_index >= len(folder_items):
+                    break
+                else:
+                    continue
+
+            # Check if adding this song exceeds the hour
+            htd = hour_total_duration + track.duration()
+            if htd > ONE_HOUR_MS:
+                folder_search_index += 1
+                if folder_search_index >= len(folder_items):
+                    break
+                continue
+
+            song_item = self._make_song_item_from_track(track, folder_item)
+            song_item.set_start_time(last_start_time.addMSecs(track.duration()))
+
+            last_start_time = song_item.start_time()
+            # Check if song already exists in the hour
+            if song_item.track_id() in existing_track_ids:
+                continue
+                
+            td = QTime(hr, 0, 0).addMSecs(hour_total_duration + track.duration()).toString("hh:mm:ss")
+
+            song_item.set_template_id(self._template.id())
+            song_item.set_hour(hr)
+            schedule_items.append(song_item)
+            hour_total_duration += song_item.duration()
+
+        return schedule_items
+
+    def _compute_st(self, schedule_items: list):
+        # Group items by hour and compute start times within each hour and update schedule_items
+        hourly_groups = {}
+        for item in schedule_items:
+            hr = item.hour()
+            if hr not in hourly_groups:
+                hourly_groups[hr] = []
+            hourly_groups[hr].append(item)
+
+        # Compute start times for each hour's items
+        for hr, items in hourly_groups.items():
+            if len(items) == 0:
+                continue
+            start_time = QTime(hr, 0, 0)
+            for item in items:
+                item.set_start_time(start_time)
+                start_time = start_time.addMSecs(item.duration())
+            # Update the schedule_items with the computed start times
+            for item in items:
+                schedule_items[schedule_items.index(item)] = item
+
+    def _find_track_within_duration(self, folder_id: int, max_duration: int, exclude_track_ids: list) -> "Track":
+        if folder_id not in self._tracks:
+            return None
+        tracks = self._tracks[folder_id]
+        suitable_tracks = [track for track in tracks.values() if track.duration() <= max_duration and track.track_id() not in exclude_track_ids]
+        if len(suitable_tracks) == 0:
+            return None
+        track = random.choice(suitable_tracks)
+        return track
+
     def _make_song_item_from_track(self, track: "Track", item: "TemplateItem") -> "SongItem":
         song_item = SongItem(track.title())
         song_item.set_artist_id(track.artist_id())
         song_item.set_duration(track.duration())
         song_item.set_title(track.title())
-
-        song_item.set_folder_name(item.folder_name())
-        song_item.set_folder_id(item.folder_id())
-
         song_item.set_track_id(track.track_id())
         song_item.set_artist_name(track.artist_name())
         song_item.set_item_path(track.file_path())
+
+        song_item.set_folder_name(item.folder_name())
+        song_item.set_folder_id(item.folder_id())
         song_item.set_hour(item.hour())
         song_item.set_start_time(item.start_time())
 
@@ -581,7 +779,7 @@ class ScheduleDialog(widget, base):
         return True
 
 
-    def _compute_start_times(self):
+    def _compute_start_timesX(self):
         for row in range(self.twSchedule.rowCount()):
 
             column1 = self.twSchedule.item(row, 0)
@@ -646,14 +844,14 @@ class ScheduleDialog(widget, base):
                 item.set_start_time(None)
 
 
-    def fetch_comm_break(self, s_date, hrs: list) ->list:
+    def fetch_comm_break(self, s_date, hr: int) ->list:
         # Fetch the commercial breaks from Traffik database
         dbconn = MSSQLData(MSSQL_CONN['server'], MSSQL_CONN['database'],
                        MSSQL_CONN['username'], MSSQL_CONN['password'])
 
         s1 = self._db_date_str(s_date)
 
-        hours = ', '.join(map(str, hrs))
+        # hours = ', '.join(map(str, hrs))
 
         if dbconn.connect():
             sql = (f"Select Schedule.ScheduleDate, Schedule.ScheduleTime, Schedule.ScheduleHour, "
@@ -662,7 +860,7 @@ class ScheduleDialog(widget, base):
                     f"where Schedule.ScheduleReference = SpotBookings.SpotBookingBreakRef "
                     f"and Spots.SpotRef = SpotBookings.SpotBookingSpot "
                     f"and scheduledate = '{s1}' "
-                    f"and ScheduleHour in ({hours}) "
+                    f"and ScheduleHour = {hr} "
                     f"and ItemSource = 'COMMS' "
                     f"and SpotBookingPlayStatus <> 'CANCEL' "
                     f"Group By Schedule.ScheduleDate, Schedule.ScheduleTime, Schedule.ScheduleHour, "
@@ -767,6 +965,7 @@ class ScheduleDialog(widget, base):
         self.schedule_updater.exec_()
 
     def schedule_update_started(self):
+        self.btnGenerate.setEnabled(False)
         self.btnSave.setEnabled(False)
         self.lblProgresText.setVisible(True)
         self.lblProgresText.setText("Saving started.")
@@ -793,6 +992,7 @@ class ScheduleDialog(widget, base):
 
 
     def schedule_update_completed(self, status: bool):
+        self.btnGenerate.setEnabled(True)
         self.btnSave.setEnabled(True)
         self.lblProgresText.setVisible(False)
         if status:
@@ -808,7 +1008,7 @@ class ScheduleDialog(widget, base):
         # scheduled_items = self.db_config.fetch_schedule_by_template_and_date_range(self._template.id(), 
         #                                                                            start_date, end_date)
         scheduled_items = self.mssql_conn.fetch_schedule_by_template_and_date_range(self._template.id(), 
-                                                                                   start_date, end_date)
+                                                                                    start_date, end_date)
 
         # Remove dates in the date_range that are not in the template's DOW
         date_range = [date for date in date_range if date.dayOfWeek() in self._template.dow()]
