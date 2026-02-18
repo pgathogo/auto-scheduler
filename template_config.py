@@ -197,7 +197,7 @@ class TemplateConfiguration(widget, base):
 
     def display_template_items(self, template:Template):
         self._setup_items_table()
-        self._populate_items_table(template.template_items())
+        self._populate_items_table(template)
 
     def _setup_items_table(self):
         self.twItems.clear()
@@ -228,18 +228,25 @@ class TemplateConfiguration(widget, base):
         self.twItems.setColumnWidth(6, 300)
         self.twItems.setColumnWidth(7, 100)
     
-    def _populate_items_table(self, template_items: dict):
-        for key, item in template_items.items():
-            if item.db_action() == DBAction.DELETE:
-                continue
+    def _populate_items_table(self, template):
+        hours = template.hours()
+        for hour in hours:
+            hour_items = template.get_items_for_hour(hour)
 
-            row = self.twItems.rowCount()
-            self.twItems.insertRow(row)
+            template_items = sorted(hour_items, key=lambda x: x.item_row())
 
-            if item.item_type() == ItemType.HEADER:
-                item.set_item_row(row)
+            for item in template_items:
+                if item.db_action() == DBAction.DELETE:
+                    continue
 
-            self.add_item_to_table(row, item)
+                row = self.twItems.rowCount()
+
+                self.twItems.insertRow(row)
+
+                if item.item_type() == ItemType.HEADER:
+                    item.set_item_row(row)
+
+                self.add_item_to_table(row, item)
 
     def _add_blank_rows(self, t_items: dict):
         prev_item = None

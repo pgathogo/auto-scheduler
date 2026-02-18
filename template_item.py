@@ -245,9 +245,11 @@ class HeaderItem(TemplateItem):
         return self._title
 
 class BlankItem(TemplateItem):
-    def __init__(self, item_title: str=""):
+    def __init__(self, item_title: str="", hour: int=-1):
         super(BlankItem, self).__init__(item_title)
         self._title = ""
+        self._hour = hour
+        self._item_row = 999999
         self._item_type = ItemType.EMPTY
 
     def make_item_identifier(self) -> str:
@@ -259,6 +261,9 @@ class BlankItem(TemplateItem):
 
     def title(self) -> str:
         return self._title
+
+    def hour(self):
+        return self._hour
 
 
 class FolderItem(TemplateItem):

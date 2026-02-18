@@ -375,7 +375,7 @@ class ScheduleDialog(widget, base):
 
             self._log_info(f"Fetching commercaial breaks for date: {str_start_date}")
 
-            for hr in self._template.hours():
+            for hr in selected_hours:
                 generated_list = self._generate_schedule_for_hour(start_date, hr)
 
                 self._cache_generated_schedule(start_date, generated_list)

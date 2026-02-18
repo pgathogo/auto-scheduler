@@ -330,8 +330,9 @@ class MSSQLData:
 
         return schedule_item
 
-    def _make_blank_item(self):
-        blank = BlankItem()
+    def _make_blank_item(self, hour: int = -1):
+        blank = BlankItem(hour)
+        blank.set_hour(hour)
         blank.set_start_time("")
         return blank
 
@@ -348,15 +349,14 @@ class MSSQLData:
                 prev_item = item
 
             elif prev_item.item_type() == ItemType.HEADER and item.item_type() == ItemType.HEADER:
-
-                blank_item = self._make_blank_item()
+                blank_item = self._make_blank_item(prev_item.hour())
                 items[blank_item.item_identifier()] = blank_item
                 items[item.item_identifier()] = item
 
                 prev_item = item
 
             elif prev_item.item_type() == ItemType.SONG and item.item_type() == ItemType.HEADER:
-                blank_item = self._make_blank_item()
+                blank_item = self._make_blank_item(prev_item.hour())
 
                 items[blank_item.item_identifier()] =  blank_item
                 items[item.item_identifier()] = item
@@ -364,7 +364,7 @@ class MSSQLData:
                 prev_item = item
 
             elif prev_item.item_type() == ItemType.FOLDER and item.item_type() == ItemType.HEADER:
-                blank_item = self._make_blank_item()
+                blank_item = self._make_blank_item(prev_item.hour())
 
                 items[blank_item.item_identifier()] =  blank_item
                 items[item.item_identifier()] = item
@@ -377,7 +377,7 @@ class MSSQLData:
 
             #time.sleep(0.05)
 
-        last_blank = self._make_blank_item()
+        last_blank = self._make_blank_item(prev_item.hour())
         items[last_blank.item_identifier()] = last_blank
 
         return items
