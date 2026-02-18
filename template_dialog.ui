@@ -161,6 +161,20 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>txtName</tabstop>
+  <tabstop>txtDescription</tabstop>
+  <tabstop>lstHours</tabstop>
+  <tabstop>cbMon</tabstop>
+  <tabstop>cbTue</tabstop>
+  <tabstop>cbWed</tabstop>
+  <tabstop>cbThu</tabstop>
+  <tabstop>cbFri</tabstop>
+  <tabstop>cbSat</tabstop>
+  <tabstop>cbSun</tabstop>
+  <tabstop>btnOk</tabstop>
+  <tabstop>btnCancel</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

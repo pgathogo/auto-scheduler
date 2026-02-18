@@ -43,6 +43,8 @@ class TemplateDialog(widget, base):
             if index is not None:
                 self.tree_combo.on_item_clicked(index)
         
+        self.txtName.setFocus()
+
     def on_tree_combo_text_changed(self, text):
         data = self.tree_combo.get_data_with_text(text)
         if data is not None:
