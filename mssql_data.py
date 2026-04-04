@@ -28,10 +28,10 @@ from data_types import MSSQL_CONN
 
 class MSSQLData:
     def __init__(self, server, database, username, password):
-        self._server = server      
-        self._database = database  
-        self._username = username  
-        self._password = password  
+        self._server = server.strip()      
+        self._database = database.strip()  
+        self._username = username.strip()  
+        self._password = password.strip()  
         self._sql_driver ="{ODBC Driver 18 for SQL Server}"
 
         self.conn_str = (f"DRIVER={self._sql_driver};"
