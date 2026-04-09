@@ -80,6 +80,7 @@ class TrackColumns(IntEnum):
     FOLDER_ID = 5
     FILEPATH = 6
     GENRE = 7
+    SHOW = 8
 
 class CommercialColumn(IntEnum):
     SCHEDULE_DATE = 0

@@ -863,13 +863,13 @@ class TemplateConfiguration(widget, base):
         mssql = self._get_mssql_connection()
 
         if mssql.connect():
-            sql = (f"Select TrackReference, TrackTitle, ArtistSearch, "
-                   f" Duration, ArtistID_1, FolderID, FilePath, Genre "
-                   f" from Tracks "
-                   f" where ArtistID_1 is not Null"
+            sql = (f"SELECT TrackReference, TrackTitle, ArtistSearch, "
+                   f" Duration, ArtistID_1, FolderID, FilePath, Genre, TrackPrimeNote "
+                   f" FROM Tracks "
+                   f" WHERE ArtistID_1 is not Null"
                      f" AND FolderID > 0 "
                      f" AND TrackDeleted = 0 "
-                   f" order by Folderid, TrackReference ")
+                   f" ORDER BY Folderid, TrackReference ")
 
             rows = mssql.execute_query(sql)
             for row in rows:
@@ -885,6 +885,7 @@ class TemplateConfiguration(widget, base):
                 track.set_folder_id(folder_id)
                 track.set_file_path(row[TrackColumns.FILEPATH])
                 track.set_genre(row[TrackColumns.GENRE])
+                track.set_show(row[TrackColumns.SHOW])
 
                 if folder_id not in folders:
                      folders[folder_id] = {}

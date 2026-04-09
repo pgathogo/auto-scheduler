@@ -9,6 +9,7 @@ class Track:
         self._folder_id = -1
         self._file_path = ""
         self._genre = -1
+        self._show = ""
 
     def track_id(self) -> int:
         return self._track_id
@@ -57,6 +58,12 @@ class Track:
     
     def set_genre(self, genre: int):
         self._genre = genre
+
+    def show(self) -> str:
+        return self._show
+    
+    def set_show(self, show: str):
+        self._show = show
 
     def formatted_track_id(self) ->str:
         return(f"{self._track_id:08d}")

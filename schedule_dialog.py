@@ -590,7 +590,7 @@ class ScheduleDialog(widget, base):
 
             if diff_duration <= SMALL_DURATION_MS and self._template.filler_folder() != -1:
                 # Look for small track in filler folder
-                track = self._find_track_within_duration(self._template.filler_folder(), diff_duration, existing_track_ids)
+                track = self._find_track_within_duration_filer_folder(self._template.filler_folder(), diff_duration, existing_track_ids)
                 if track is None:
                     break
 
@@ -630,6 +630,9 @@ class ScheduleDialog(widget, base):
             song_item.set_template_id(self._template.id())
             song_item.set_hour(hr)
             schedule_items.append(song_item)
+
+            existing_track_ids.append(song_item.track_id())
+
             hour_total_duration += song_item.duration()
 
         return schedule_items
@@ -655,15 +658,62 @@ class ScheduleDialog(widget, base):
             for item in items:
                 schedule_items[schedule_items.index(item)] = item
 
+    def _find_track_within_duration_filer_folder(self, folder_id: int, max_duration: int, exclude_track_ids: list) -> "Track":
+        if folder_id not in self._tracks:
+            return None
+
+        tracks = self._tracks[folder_id]
+
+        # Within the filer folder, find tracks associated with the current template that have duration less than or equal to the max_duration and not in the exclude_track_ids list return a dict
+        filtered_tracks, tracks = self._filter_tracks_linked_to_template(self._template.id(), tracks)
+
+        suitable_tracks = []
+
+        if len(filtered_tracks) > 0:
+            suitable_tracks = [track for track in filtered_tracks.values() if track.duration() <= max_duration and track.track_id() not in exclude_track_ids]
+            if len(suitable_tracks) == 0:
+                return None
+
+            if len(suitable_tracks) == 0:
+                # Check if you can find any track in the entire folder that is not linked to any template and has duration less than or equal to the max_duration and not in the exclude_track_ids list
+                suitable_tracks = [track for track in tracks.values() if track.duration() <= max_duration and track.track_id() not in exclude_track_ids]
+                if len(suitable_tracks) == 0:
+                    return None
+        else:
+            suitable_tracks = [track for track in tracks.values() if track.duration() <= max_duration and track.track_id() not in exclude_track_ids]
+            if len(suitable_tracks) == 0:
+                return None
+
+        track = random.choice(suitable_tracks)
+        return track
+
     def _find_track_within_duration(self, folder_id: int, max_duration: int, exclude_track_ids: list) -> "Track":
         if folder_id not in self._tracks:
             return None
+
         tracks = self._tracks[folder_id]
+
         suitable_tracks = [track for track in tracks.values() if track.duration() <= max_duration and track.track_id() not in exclude_track_ids]
         if len(suitable_tracks) == 0:
             return None
         track = random.choice(suitable_tracks)
         return track
+
+    def _filter_tracks_linked_to_template(self, template_id: int, tracks: dict) -> tuple[dict, dict]:
+        # Track is linked to template in member using field show, that contains comma separated template IDs. If the field is empty, it means the track is linked to all templates. If the field contains the current template ID, it means the track is linked to the current template.
+        all_tracks = {}
+        filtered_tracks = {}
+        for track_id, track in tracks.items():
+            show_field = track.show()
+            if show_field == "" or show_field is None:
+                all_tracks[track_id] = track
+            else:   
+                show_template_ids = [int(tid.strip()) for tid in show_field.split(",")]
+                if template_id in show_template_ids:
+                    filtered_tracks[track_id] = track
+
+        return filtered_tracks, all_tracks
+    
 
     def _make_song_item_from_track(self, track: "Track", item: "TemplateItem") -> "SongItem":
         song_item = SongItem(track.title())
