@@ -5,6 +5,8 @@
 *~
 *__*
 *.sh
+*.rar
+*.zip
 
 # Folders
 data/
