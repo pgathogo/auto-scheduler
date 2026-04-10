@@ -484,6 +484,8 @@ class ScheduleDialog(widget, base):
     def _convert_category_to_track(self, schedule_items, template_id: int) -> list:
         s_items = []
 
+        ONE_HOUR_MS = 3600000
+
         for item in schedule_items:
 
             if item.item_type() != ItemType.FOLDER:
@@ -491,8 +493,15 @@ class ScheduleDialog(widget, base):
                 if item.item_type() == ItemType.SONG and item.rotation() == "R":
                     track = self._pick_a_random_track_by_genre(item)
                     track.set_template_id(template_id)
+
+                    total_duration = sum([item.duration() for item in s_items])
+                    if (total_duration + track.duration()) > ONE_HOUR_MS:
+                        break
                     s_items.append(track)
                 else:
+                    total_duration = sum([item.duration() for item in s_items])
+                    if (total_duration + item.duration()) > ONE_HOUR_MS:
+                        break
                     s_items.append(item)
             else:
 
@@ -506,6 +515,9 @@ class ScheduleDialog(widget, base):
                 song_item = self._make_song_item_from_track(track, item)
                 song_item.set_template_id(template_id)
 
+                total_duration = sum([item.duration() for item in s_items])
+                if (total_duration + song_item.duration()) > ONE_HOUR_MS:
+                    break
                 s_items.append(song_item)
 
         return s_items

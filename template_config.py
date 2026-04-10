@@ -858,7 +858,7 @@ class TemplateConfiguration(widget, base):
         return MSSQLData(server, database, username, password)
 
     def load_tracks(self) -> dict:
-        folders = {}
+        tracks = {}
 
         mssql = self._get_mssql_connection()
 
@@ -887,12 +887,12 @@ class TemplateConfiguration(widget, base):
                 track.set_genre(row[TrackColumns.GENRE])
                 track.set_show(row[TrackColumns.SHOW])
 
-                if folder_id not in folders:
-                     folders[folder_id] = {}
+                if folder_id not in tracks:
+                    tracks[folder_id] = {}
 
-                folders[folder_id][track_reference] = track
+                tracks[folder_id][track_reference] = track
 
-        return folders
+        return tracks
 
     def track_count(self, folder_id:int) -> int:
         if folder_id not in self.tracks:
